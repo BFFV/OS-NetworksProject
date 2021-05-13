@@ -3,15 +3,15 @@ Project for IIC2333 - Operating Systems &amp; Networks.
 
 **Team**
 
-| name            | mail                |
-| --------------- | ------------------- |
-| Vicente Castro  | [johndoe@uc.cl]     |
-| Benjamín Farías | [bffarias@uc.cl]    |
-| Mauro Mendoza   | [msmendoza@uc.cl]   |
-| Juan Romero     | [jaromero@uc.cl]    |
-| Francisco Tobar | [fvtobar@uc.cl]     |
+| name            | mail              | alumni nº
+| --------------- | ----------------- | -----------
+| Vicente Castro  | [vvcastro@uc.cl]  | 1763668J
+| Benjamín Farías | [bffarias@uc.cl]  | 17642531
+| Mauro Mendoza   | [msmendoza@uc.cl] | 17639743
+| Juan Romero     | [jaromero@uc.cl]  | 17639298
+| Francisco Tobar | [fvtobar@uc.cl]   | 17207118
 
-[johndoe@uc.cl]:   mailto:johndoe@uc.cl
+[johndoe@uc.cl]:   mailto:vvcastros@uc.cl
 [bffarias@uc.cl]:  mailto:bffarias@uc.cl
 [msmendoza@uc.cl]: mailto:msmendoza@uc.cl
 [jaromero@uc.cl]:  mailto:jaromero@uc.cl
