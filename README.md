@@ -11,7 +11,7 @@ Project for IIC2333 - Operating Systems &amp; Networks.
 | Juan Romero     | [jaromero@uc.cl]  | 17639298
 | Francisco Tobar | [fvtobar@uc.cl]   | 17207118
 
-[johndoe@uc.cl]:   mailto:vvcastros@uc.cl
+[vvcastro@uc.cl]:  mailto:vvcastros@uc.cl
 [bffarias@uc.cl]:  mailto:bffarias@uc.cl
 [msmendoza@uc.cl]: mailto:msmendoza@uc.cl
 [jaromero@uc.cl]:  mailto:jaromero@uc.cl
