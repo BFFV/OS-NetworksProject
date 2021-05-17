@@ -60,6 +60,7 @@ dkms.conf
 *.html
 report
 __pycache__
+P1/disks/
 
 # macOS
 .DS_Store

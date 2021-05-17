@@ -2,7 +2,7 @@
 
 
 // OldSchool File System Demo
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
     // Check input
     if (argc < 2) {
@@ -11,6 +11,8 @@ int main(int argc, char **argv) {
     }
 
     // Demo
-    // argv[1] => virtual disk
+    os_mount(argv[1], 0);
+    os_bitmap((unsigned) 1);
+    clean_vars();
     return 0;
 }

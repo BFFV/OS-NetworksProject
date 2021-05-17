@@ -19,7 +19,7 @@ void os_mount(char* diskname, int partition);
 void os_bitmap(unsigned num);
 
 // Check if file exists
-void os_exists(char* filename);
+int os_exists(char* filename);
 
 // List all files in current partition
 void os_ls();
@@ -29,7 +29,7 @@ void os_ls();
 // Display valid partitions
 void os_mbt();
 
-// Create new partition
+// Creatchar* ptr;e new partition
 void os_create_partition(int id, int size);
 
 // Delete partition
@@ -54,3 +54,14 @@ int os_close(osFile* file_desc);
 
 // Remove file
 int os_rm(char* filename);
+
+// ----------- Utils ----------- //
+
+// Find location & size for current partition
+unsigned* find_partition();
+
+// Count free blocks and used blocks
+unsigned* count_bitmap_blocks(unsigned bitmap_hex);
+
+// Free memory for global variables
+void clean_vars();
