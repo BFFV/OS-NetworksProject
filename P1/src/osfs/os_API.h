@@ -61,7 +61,10 @@ int os_rm(char* filename);
 unsigned* find_partition();
 
 // Count free blocks and used blocks
-unsigned* count_bitmap_blocks(unsigned bitmap_hex);
+void count_bitmap_blocks(char* bitmap);
+
+// Sort valid partitions according to order in disk
+void sort_mbt(unsigned* partitions, unsigned* sizes, int n);
 
 // Free memory for global variables
 void clean_vars();
