@@ -12,10 +12,14 @@ int main(int argc, char** argv) {
 
     // Demo
     os_mount(argv[1], 0);
-    //reset_mbt();
+    reset_mbt();
     os_mbt();
-    //os_bitmap(0);
-    //os_create_partition(0, 16384);
+    for (int p = 0; p < 128; p++) {
+        os_create_partition(p, 16384);
+        os_mount(argv[1], p);
+    }
+    os_bitmap(0);
+    os_mbt();
     clean_vars();
     return 0;
 }

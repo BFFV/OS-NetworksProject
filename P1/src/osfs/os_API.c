@@ -1,8 +1,8 @@
 #include "os_API.h"
-#include <stdbool.h>
 
 #define RED "\e[0;31m"
 #define GRN "\e[0;32m"
+#define DEFAULT "\e[0m"
 
 // ----------- Global Variables ----------- //
 
@@ -29,43 +29,55 @@ void os_bitmap(unsigned num) {
     FILE* file = fopen(disk_path, "rb");
 
     // 1024 skip MBT, partition_start * 2048 to partition, 2048 skips directory
-    fseek(file, 1024 + partition_info[0] * 2048 + 2048, SEEK_SET);
-    int bitmap_count = partition_info[1] / 16384;
-    char* buffer = calloc(2048, sizeof(char));
+    fseek(file, 1024 + (partition_info[0] + 1) * 2048, SEEK_SET);
+    fpos_t position;
+    fgetpos(file, &position);
+    int bitmap_count = ceil((double) partition_info[1] / 16384);
+    unsigned* buffer = calloc(1, sizeof(unsigned));
+    char* bitmap_block = calloc(2048, sizeof(char));
 
     // Display bitmaps
     if (!num) {
         for (int bitmap = 0; bitmap < bitmap_count; bitmap++) {
-            fread(buffer, 1, 2048, file);
+            fsetpos(file, &position);
+            fseek(file, 2048 * bitmap, SEEK_CUR);
 
             // Convert bytes to hex
             fprintf(stderr, GRN "\n0x\n");
             for (int byte = 0; byte < 2048; byte++) {
-                char current_byte = buffer[byte];
-                fprintf(stderr, GRN "%x", current_byte >> 4);
-                fprintf(stderr, GRN "%x", (current_byte << 4) >> 4);
+                fread(buffer, 1, 1, file);
+                unsigned current_byte = *buffer;
+                fprintf(stderr, GRN "%X", current_byte >> 4);
+                fprintf(stderr, GRN "%X", current_byte & 15);
                 if (!((byte + 1) % 64)) {
                     fprintf(stderr, "\n");
                 }
             }
-            count_bitmap_blocks(buffer);
+            fsetpos(file, &position);
+            fseek(file, 2048 * bitmap, SEEK_CUR);
+            fread(bitmap_block, 2048, 1, file);
+            count_bitmap_blocks(bitmap_block);
         }
     } else {
         fseek(file, 2048 * (num - 1), SEEK_CUR);
-        fread(buffer, 1, 2048, file);
 
         // Convert bytes to hex
         fprintf(stderr, GRN "\n0x\n");
         for (int byte = 0; byte < 2048; byte++) {
-            char current_byte = buffer[byte];
-            fprintf(stderr, GRN "%x", current_byte >> 4);
-            fprintf(stderr, GRN "%x", (current_byte << 4) >> 4);
+            fread(buffer, 1, 1, file);
+            unsigned current_byte = *buffer;
+            fprintf(stderr, GRN "%X", current_byte >> 4);
+            fprintf(stderr, GRN "%X", current_byte & 15);
             if (!((byte + 1) % 64)) {
                 fprintf(stderr, "\n");
             }
         }
-        count_bitmap_blocks(buffer);
+        fsetpos(file, &position);
+        fseek(file, 2048 * (num - 1), SEEK_CUR);
+        fread(bitmap_block, 2048, 1, file);
+        count_bitmap_blocks(bitmap_block);
     }
+    fprintf(stdout, DEFAULT "\n");
 
     // Memory cleaning
     free(buffer);
@@ -132,66 +144,73 @@ void os_ls() {
 
 // Display valid partitions
 void os_mbt() {
-    char* buffer = calloc(8, sizeof(char));
-    FILE* file = fopen(disk_path, "rb");
-    printf(">> Valid Partitions\n\n");
+    unsigned* partition_header = calloc(1, sizeof(unsigned));
+    unsigned* pos = calloc(1, sizeof(unsigned));
+    unsigned* size = calloc(1, sizeof(unsigned));
 
-    for (int entry = 0; entry < 128; entry++){
-        fread(buffer, 1, 8, file);
+    FILE* file = fopen(disk_path, "rb");
+
+    printf(">> Valid Partitions\n\n");
+    for (int entry = 0; entry < 128; entry++) {
+        fseek(file, entry * 8, SEEK_SET);
+        fread(partition_header, 1, 1, file);
 
         // check if block is valid
-        unsigned is_valid = (unsigned) buffer[0] >> 7;
-        int partition_id = (int)(buffer[0] << 1) >> 1;
+        unsigned is_valid = *partition_header >> 7;
+        unsigned partition_id = 128 ^ *partition_header;
 
         if (is_valid) {
-            printf("PID: %d\n", partition_id);
+            fread(pos, 3, 1, file);
+            fread(size, 4, 1, file);
+            printf("PID: %u\n", partition_id);
+            printf("  - Size: %u @ Pos: %u \n\n", *size, *pos);
         }
     }
 
     // Memory clean
-    free(buffer);
+    free(partition_header);
+    free(size);
+    free(pos);
     fclose(file);
 }
 
 // Create new partitions
 void os_create_partition(int id, int size) {
     // TODO: ID not in range, invalid size
+
     unsigned* partitions = malloc(128 * sizeof(unsigned));
     unsigned* sizes = malloc(128 * sizeof(unsigned));
+    unsigned* partition_header = calloc(1, sizeof(unsigned));
+    unsigned* abs_id = calloc(1, sizeof(unsigned));
+    unsigned* partition_size = calloc(1, sizeof(unsigned));
+
     int valid_partitions = 0;
     int new_entry = -1;
-    char* buffer = calloc(8, sizeof(char));
     FILE* file = fopen(disk_path, "rb");
 
     for (int entry = 0; entry < 128; entry++) {
-        fread(buffer, 1, 8, file);
+        fseek(file, entry * 8, SEEK_SET);
+        fread(partition_header, 1, 1, file);
 
         // Get entry information
-        unsigned valid = buffer[0] >> 7;
-        int partition_id = (int) (buffer[0] << 1) >> 1;
+        unsigned valid = *partition_header >> 7;
+        unsigned partition_id = 128 ^ *partition_header;
 
         // Checks valid bit
         if (valid) {
 
             if (id == partition_id) {
                 //TODO: Error existing id
-                printf("F");
+                printf("F\n");
             }
 
             // Get absolute position for partition
-            char abs_id[3];
-            for (int index = 1; index < 4; index++) {
-                abs_id[index - 1] = buffer[index];
-            }
-            char* ptr;
-            partitions[valid_partitions] = (unsigned) strtoul(abs_id, &ptr, 2);
+            fread(abs_id, 3, 1, file);
+            partitions[valid_partitions] = *abs_id;
 
             // Get size for partition
-            char partition_size[4];
-            for (int index = 4; index < 8; index++) {
-                partition_size[index - 4] = buffer[index];
-            }
-            sizes[valid_partitions] = (unsigned) strtoul(partition_size, &ptr, 2);
+            fread(partition_size, 4, 1, file);
+            sizes[valid_partitions] = *partition_size;
 
             valid_partitions++;
         } else if (new_entry == -1) {
@@ -207,25 +226,39 @@ void os_create_partition(int id, int size) {
     for (int p = 0; p <= valid_partitions; p++) {
         unsigned free_space;
         if (p == valid_partitions) {
-            free_space = 2097151 - previous_end;
+            free_space = 2097152 - previous_end;
         } else {
             free_space = partitions[p] - previous_end;
             previous_end = partitions[p] + sizes[p];
         }
         if ((free_space >= size) && searching) {
-            FILE *file = fopen(disk_path, "rb+");
+            FILE* file = fopen(disk_path, "rb+");
             fseek(file, new_entry * 8, SEEK_SET);
 
-            unsigned valid = 128 + id;
+            unsigned valid = 128 | id;
             fwrite(&valid, 1, 1, file);
             fwrite(&previous_end, 3, 1, file);
             fwrite(&size, 4, 1, file);
 
             // Erase previous directory & bitmaps from partition
             fseek(file, 1024 + previous_end * 2048, SEEK_SET);
-            unsigned empty = 0;
-            int bitmap_count = size / 16384;
-            fwrite(&empty, (bitmap_count + 1) * 2048, 1, file);
+            for (int byte = 0; byte < 2048; byte++) {
+                unsigned current_byte = 0;
+                fwrite(&current_byte, 1, 1, file);
+            }
+            int bitmap_count = ceil((double) size / 16384);
+            unsigned header = 128;
+            for (int block = 0; (block < bitmap_count) && (block < 7); block++) {
+                header = 128 | (header >> 1);
+            }
+            fwrite(&header, 1, 1, file);
+            for (int byte = 1; byte < bitmap_count * 2048; byte++) {
+                unsigned current_byte = 0;
+                if ((bitmap_count == 8) && (byte == 1)) {
+                    current_byte = 128;
+                }
+                fwrite(&current_byte, 1, 1, file);
+            }
             fclose(file);
 
             searching = false;
@@ -240,26 +273,30 @@ void os_create_partition(int id, int size) {
     // Free memory
     free(partitions);
     free(sizes);
-    free(buffer);
+    free(partition_header);
+    free(abs_id);
+    free(partition_size);
 }
 
 // Delete partition
 void os_delete_partition(int id) {
-    char* buffer = calloc(8, sizeof(char));
+    unsigned* partition_header = calloc(1, sizeof(unsigned));
+
     FILE* file = fopen(disk_path, "rb+");
     fpos_t position;
 
     for (int entry = 0; entry < 128; entry++){
+        fseek(file, entry * 8, SEEK_SET);
+
         fgetpos(file, &position);
-        fread(buffer, 1, 8, file);
+        fread(partition_header, 1, 1, file);
 
         // check for block validity and id
-        unsigned is_valid = (unsigned) buffer[0] >> 7;
-        int partition_id = (int)(buffer[0] << 1) >> 1;
-
-        unsigned valid = 0;
+        unsigned is_valid = *partition_header >> 7;
+        unsigned partition_id = 128 ^ *partition_header;
 
         // Change valid bit to zero if it is valid
+        unsigned valid = 0;
         if (is_valid && partition_id == id) {
             fsetpos(file, &position);
             fwrite(&valid, 1, 1, file);
@@ -267,29 +304,22 @@ void os_delete_partition(int id) {
     }
 
     // memory clean
-    free(buffer);
     fclose(file);
 }
 
 // Delete all partitions
 void reset_mbt() {
-    char* buffer = calloc(8, sizeof(char));
     FILE* file = fopen(disk_path, "rb+");
-    fpos_t position;
 
     for (int entry = 0; entry < 128; entry++){
-        fgetpos(file, &position);
-        fread(buffer, 1, 8, file);
+        fseek(file, entry * 8, SEEK_SET);
 
         // Change valid bit to zero if it is valid
         unsigned valid = 0;
-
-        fsetpos(file, &position);
         fwrite(&valid, 1, 1, file);
     }
 
     // memory clean
-    free(buffer);
     fclose(file);
 }
 
@@ -325,42 +355,44 @@ int os_rm(char* filename) {
 // Find location for current partition
 unsigned* find_partition() {
     unsigned* partition_info = malloc(2 * sizeof(unsigned));
-    char* buffer = calloc(8, sizeof(char));
+    unsigned* partition_header = calloc(1, sizeof(unsigned));
+    unsigned* abs_id = calloc(1, sizeof(unsigned));
+    unsigned* partition_size = calloc(1, sizeof(unsigned));
     FILE* file = fopen(disk_path, "rb");
+
     for (int entry = 0; entry < 128; entry++) {
-        fread(buffer, 1, 8, file);
+        fseek(file, entry * 8, SEEK_SET);
+        fread(partition_header, 1, 1, file);
 
         // Get entry information
-        unsigned valid = buffer[0] >> 7;
-        int partition_id = (int) (buffer[0] << 1) >> 1;
+        unsigned valid = *partition_header >> 7;
+        unsigned partition_id = 128 ^ *partition_header;
 
         // Checks valid bit and if block represents current partition
         if (valid && (partition_id == current_partition)) {
 
             // Get absolute position for partition
-            char abs_id[3];
-            for (int index = 1; index < 4; index++) {
-                abs_id[index - 1] = buffer[index];
-            }
-            char* ptr;
-            partition_info[0] = (unsigned) strtoul(abs_id, &ptr, 2);
+            fread(abs_id, 3, 1, file);
+            partition_info[0] = *abs_id;
 
             // Get size for partition
-            char partition_size[4];
-            for (int index = 4; index < 8; index++) {
-                partition_size[index - 4] = buffer[index];
-            }
-            partition_info[1] = (unsigned) strtoul(partition_size, &ptr, 2);
+            fread(partition_size, 4, 1, file);
+            partition_info[1] = *partition_size;
 
             // Free memory and return start pointer
-            free(buffer);
+            free(partition_header);
+            free(abs_id);
+            free(partition_size);
             fclose(file);
             return partition_info;
         }
     }
 
-    free(buffer);
+    free(partition_header);
+    free(abs_id);
+    free(partition_size);
     fclose(file);
+
     // TODO: Partición no encontrada
     return NULL;
 }
@@ -382,7 +414,7 @@ void count_bitmap_blocks(char* bitmap) {
         }
     }
     fprintf(stderr, GRN "\n\nUsed Blocks: %u\n", used_blocks);
-    fprintf(stderr, GRN "Free Blocks: %u\n", free_blocks);
+    fprintf(stderr, GRN "Free Blocks: %u\n\n", free_blocks);
 }
 
 // Sort valid partitions according to order in disk
