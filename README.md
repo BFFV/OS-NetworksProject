@@ -9,10 +9,8 @@ Project for IIC2333 - Operating Systems &amp; Networks.
 | Benjamín Farías | [bffarias@uc.cl]  | 17642531
 | Mauro Mendoza   | [msmendoza@uc.cl] | 17639743
 | Juan Romero     | [jaromero6@uc.cl]  | 17639298
-| Francisco Tobar | [fvtobar@uc.cl]   | 17207118
 
 [vvcastro@uc.cl]:  mailto:vvcastro@uc.cl
 [bffarias@uc.cl]:  mailto:bffarias@uc.cl
 [msmendoza@uc.cl]: mailto:msmendoza@uc.cl
 [jaromero6@uc.cl]:  mailto:jaromero6@uc.cl
-[fvtobar@uc.cl]:   mailto:fvtobar@uc.cl
