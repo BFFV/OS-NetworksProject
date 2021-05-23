@@ -1,14 +1,18 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 #pragma once
 
 
 // Manage files
 typedef struct os_file {
-    int file_id;
+    char mode;  // Mode (Read/Write)
+    unsigned partition_pos;  // Absolute ID for partition (root directory)
+    unsigned current_block;  // Cursor position (block) relative to partition
+    unsigned current_byte;  // Cursor position (block)
+    unsigned index_block;  // Index block for this file
 } osFile;
 
 // ----------- General Functions ----------- //
@@ -30,7 +34,7 @@ void os_ls();
 // Display valid partitions
 void os_mbt();
 
-// Creatchar* ptr;e new partition
+// Create new partition
 void os_create_partition(int id, int size);
 
 // Delete partition
@@ -61,7 +65,7 @@ int os_rm(char* filename);
 // Find location & size for current partition
 unsigned* find_partition();
 
-// Count free blocks and used blocks
+// Display free & used blocks
 void count_bitmap_blocks(char* bitmap);
 
 // Sort valid partitions according to order in disk
