@@ -13,8 +13,8 @@ int main(int argc, char** argv) {
     // Demo
     os_mount(argv[1], 0);
     reset_mbt();
-    os_mbt();
     os_create_partition(0, 16384);
+    os_mbt();
     os_bitmap(0);
     osFile* bitwiser = os_open("bitwiser.bin", 'w');
     os_close(bitwiser);

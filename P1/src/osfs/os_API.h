@@ -10,9 +10,9 @@
 typedef struct os_file {
     char mode;  // Mode (Read/Write)
     unsigned partition_pos;  // Absolute ID for partition (root directory)
-    unsigned current_block;  // Cursor position (block) relative to partition
-    unsigned current_byte;  // Cursor position (block)
+    unsigned current_byte;  // Offset (block)
     unsigned index_block;  // Index block for this file
+    unsigned bytes;  // Bytes currently read/written
 } osFile;
 
 // ----------- General Functions ----------- //
@@ -70,6 +70,12 @@ void count_bitmap_blocks(char* bitmap);
 
 // Sort valid partitions according to order in disk
 void sort_mbt(unsigned* partitions, unsigned* sizes, int n);
+
+// Converts unsigned between little endian & big endian
+unsigned to_big_endian(unsigned n, int n_bytes);
+
+// Converts unsigned long between little endian & big endian
+unsigned to_big_endian_long(unsigned long n, int n_bytes);
 
 // Free memory for global variables
 void clean_vars();
