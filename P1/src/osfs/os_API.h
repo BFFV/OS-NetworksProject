@@ -75,7 +75,7 @@ void sort_mbt(unsigned* partitions, unsigned* sizes, int n);
 unsigned to_big_endian(unsigned n, int n_bytes);
 
 // Converts unsigned long between little endian & big endian
-unsigned to_big_endian_long(unsigned long n, int n_bytes);
+unsigned long to_big_endian_long(unsigned long n, int n_bytes);
 
 // Free memory for global variables
 void clean_vars();

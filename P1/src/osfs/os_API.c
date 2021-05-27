@@ -702,7 +702,7 @@ unsigned to_big_endian(unsigned n, int n_bytes) {
 }
 
 // Converts unsigned long between little endian & big endian
-unsigned to_big_endian_long(unsigned long n, int n_bytes) {
+unsigned long to_big_endian_long(unsigned long n, int n_bytes) {
     unsigned long first = n << 56;
     unsigned long second = ((n >> 8) & 0xFF) << 48;
     unsigned long third = ((n >> 16) & 0xFF) << 40;
