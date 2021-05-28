@@ -159,7 +159,7 @@ void os_mbt() {
 
     FILE* file = fopen(disk_path, "rb");
 
-    printf(">> Valid Partitions\n\n");
+    printf("\n>> Valid Partitions\n\n");
     for (int entry = 0; entry < 128; entry++) {
         fseek(file, entry * 8, SEEK_SET);
         fread(partition_header, 1, 1, file);
@@ -172,8 +172,8 @@ void os_mbt() {
         if (is_valid) {
             fread(pos, 3, 1, file);
             fread(size, 4, 1, file);
-            printf("PID: %u\n", partition_id);
-            printf("  - Size: %u @ Pos: %u \n\n", to_big_endian(*size, 4), to_big_endian(*pos, 3));
+            printf("Partition ID: %u  ", partition_id);
+            printf("(Starting Block: %u, Size: %u)\n\n", to_big_endian(*pos, 3), to_big_endian(*size, 4));
         }
     }
 
@@ -698,7 +698,7 @@ unsigned to_big_endian(unsigned n, int n_bytes) {
     unsigned third = ((n >> 16) & 0xFF) << 8;
     unsigned fourth = n >> 24;
     unsigned big_endian = first | second | third | fourth;
-    return big_endian >> 8 * (4 - n);
+    return big_endian >> 8 * (4 - n_bytes);
 }
 
 // Converts unsigned long between little endian & big endian
@@ -712,7 +712,7 @@ unsigned long to_big_endian_long(unsigned long n, int n_bytes) {
     unsigned long seventh = ((n >> 48) & 0xFF) << 8;
     unsigned long eight = n >> 56;
     unsigned long big_endian = first | second | third | fourth | fifth | sixth | seventh | eight;
-    return big_endian >> 8 * (8 - n);
+    return big_endian >> 8 * (8 - n_bytes);
 }
 
 // Free memory for global variables
