@@ -10,7 +10,7 @@
 typedef struct os_file {
     char mode;  // Mode (Read/Write)
     unsigned partition_pos;  // Absolute ID for partition (root directory)
-    unsigned current_byte;  // Offset (block)
+    unsigned partition_size;  // Size of partition (in blocks)
     unsigned index_block;  // Index block for this file
     unsigned bytes;  // Bytes currently read/written
 } osFile;
@@ -77,5 +77,8 @@ unsigned to_big_endian(unsigned n, int n_bytes);
 // Converts unsigned long between little endian & big endian
 unsigned long to_big_endian_long(unsigned long n, int n_bytes);
 
+// Reserve new block for data
+unsigned get_free_block(unsigned partition_start, unsigned partition_size, FILE* file);
+
 // Free memory for global variables
-void clean_vars();
+void os_unmount();

@@ -13,7 +13,7 @@ int current_partition; // Current partition where the disk is mounted
 
 // Mount disk into a specific partition
 void os_mount(char* diskname, int partition) {
-    clean_vars();
+    os_unmount();
     disk_path = calloc(strlen(diskname) + 1, sizeof(char));
     strcpy(disk_path, diskname);
     current_partition = partition;
@@ -389,8 +389,8 @@ osFile* os_open(char* filename, char mode) {
         osFile* stream = malloc(sizeof(osFile));
         stream->mode = mode;
         stream->partition_pos = partition_info[0];
+        stream->partition_size = partition_info[1];
         stream->index_block = index_pos;
-        stream->current_byte = 0;
         stream->bytes = 0;
 
         // Free memory and return osFile
@@ -405,40 +405,13 @@ osFile* os_open(char* filename, char mode) {
 
     // Create osFile for writing
     if (mode == 'w' && !file_found && new_entry >= 0) {
-        fsetpos(file, &position);
-        fseek(file, 2048, SEEK_CUR);
-        fpos_t bitmap_pos; // Holds position for partition bitmaps
-        fgetpos(file, &bitmap_pos);
-        int bitmap_count = ceil((double) partition_info[1] / 16384);
 
-        // Search for free block
-        unsigned free_block = 0;
-        for (int bitmap = 0; bitmap < bitmap_count; bitmap++) {
-            for (int byte = 0; byte < 2048; byte++) {
-                fread(buffer, 1, 1, file);
-                unsigned current_byte = *buffer;
-                for (int bit = 0; bit < 8; bit++) {
-                    if (!((current_byte >> (7 - bit)) & 1)) {  // Update bitmap for index block
-                        free_block = bitmap * 16384 + byte * 8 + bit;
-                        fsetpos(file, &bitmap_pos);
-                        fseek(file, bitmap * 2048 + byte, SEEK_CUR);
-                        unsigned new_byte = (128 >> bit) | current_byte;
-                        fwrite(&new_byte, 1, 1, file);
-                        break;
-                    }
-                }
-                if (free_block) {
-                    break;
-                }
-            }
-            if (free_block) {
-                break;
-            }
-        }
-
+        // Reserve block for index
+        unsigned free_block = get_free_block(partition_info[0], partition_info[1], file);
         if (!free_block) {
             // TODO: No space available
             printf("No space available!\n");
+            return NULL;
         }
 
         // Create directory entry
@@ -473,9 +446,9 @@ osFile* os_open(char* filename, char mode) {
         osFile* stream = malloc(sizeof(osFile));
         stream->mode = mode;
         stream->partition_pos = partition_info[0];
+        stream->partition_size = partition_info[1];
         stream->index_block = free_block;
         stream->bytes = 0;
-        stream->current_byte = 0;
 
         // Free memory
         free(partition_info);
@@ -498,12 +471,171 @@ osFile* os_open(char* filename, char mode) {
 
 // Read file
 int os_read(osFile* file_desc, void* buffer, int nbytes) {
-    // TODO:
+
+    // TODO: osFile is in write mode
+    if (file_desc->mode != 'r') {
+        printf("File must be in 'read' mode!\n");
+        return 0;
+    }
+
+    // TODO: nbytes is negative
+
+    // Move to index block for file
+    FILE* file = fopen(disk_path, "rb");
+    unsigned long* file_size = calloc(1, sizeof(unsigned long));
+    unsigned* data_block = calloc(1, sizeof(unsigned));
+
+    // 1024 skips MBT, partition_pos * 2048 skips to partition, index_block skips to index block for file
+    fseek(file, 1024 + (file_desc->partition_pos + file_desc->index_block) * 2048, SEEK_SET);
+    fpos_t index_position; // Holds position for index block
+    fgetpos(file, &index_position);
+    bool reading = true;
+
+    // Read current file size
+    fsetpos(file, &index_position);
+    fread(file_size, 5, 1, file);
+    *file_size = to_big_endian_long(*file_size, 5);
+    unsigned block_count = floor((double) *file_size / 2048);
+    unsigned bytes_read = 0;
+
+    // Read loop
+    while (reading) {
+
+        // Find data block location
+        unsigned current_block = floor((double) file_desc->bytes / 2048);
+        fsetpos(file, &index_position);
+        fseek(file, 5 + 3 * current_block, SEEK_CUR);
+        fread(data_block, 3, 1, file);
+        *data_block = to_big_endian(*data_block, 3);
+        fseek(file, 1024 + (file_desc->partition_pos + *data_block) * 2048, SEEK_SET);
+        unsigned offset = file_desc->bytes % 2048;
+        fseek(file, offset, SEEK_CUR);
+
+        // Read data block
+        unsigned remaining_data = *file_size - file_desc->bytes;
+        unsigned free_space = 2048 - offset;
+        unsigned remaining = nbytes - file_desc->bytes;
+        unsigned bytes_to_read = free_space;
+        if ((remaining < free_space) && (remaining <= remaining_data)) {
+            bytes_to_read = remaining;
+        } else if ((remaining_data < free_space) && (remaining_data <= remaining)) {
+            bytes_to_read = remaining_data;
+        }
+        char* origin = buffer;
+        fread(origin + bytes_read, 1, bytes_to_read, file);
+        file_desc->bytes += bytes_to_read;
+        bytes_read += bytes_to_read;
+
+        // Check completion
+        if ((bytes_read == nbytes) || (file_desc->bytes == *file_size)) {
+            reading = false;
+        }
+    }
+
+    // Memory cleaning
+    free(file_size);
+    free(data_block);
+    fclose(file);
+
+    return bytes_read;
 }
 
 // Write file
 int os_write(osFile* file_desc, void* buffer, int nbytes) {
-    // TODO:
+
+    // TODO: osFile is in read mode
+    if (file_desc->mode != 'w') {
+        printf("File must be in 'write' mode!\n");
+        return 0;
+    }
+
+    // TODO: nbytes is negative
+
+    // Move to index block for file
+    FILE* file = fopen(disk_path, "rb+");
+    unsigned long* file_size = calloc(1, sizeof(unsigned long));
+    unsigned* data_block = calloc(1, sizeof(unsigned));
+
+    // 1024 skips MBT, partition_pos * 2048 skips to partition, index_block skips to index block for file
+    fseek(file, 1024 + (file_desc->partition_pos + file_desc->index_block) * 2048, SEEK_SET);
+    fpos_t index_position; // Holds position for index block
+    fgetpos(file, &index_position);
+    file_desc->bytes = 0;
+    bool writing = true;
+
+    // Write loop
+    while (writing) {
+
+        // Read current file size
+        fsetpos(file, &index_position);
+        fread(file_size, 5, 1, file);
+        *file_size = to_big_endian_long(*file_size, 5);
+
+        // Allocate new data block
+        if (!(*file_size % 2048)) {
+
+            // Get block count
+            unsigned block_count = *file_size / 2048;
+            if (block_count == 681) {
+                // TODO: Max file size reached!
+                // TODO: free memory
+                break;
+            }
+
+            // Get new data block
+            unsigned new_block = get_free_block(file_desc->partition_pos, file_desc->partition_size, file);
+            if (!new_block){
+                // TODO: NO space
+                printf("No space available!\n");
+                break;
+            }
+
+            // Create pointer to new data block
+            fsetpos(file, &index_position);
+            fseek(file, 5 + 3 * block_count, SEEK_CUR);
+            new_block = to_big_endian(new_block, 3);
+            fwrite(&new_block, 3, 1, file);
+        }
+
+        // Find data block location
+        unsigned current_block = floor((double) *file_size / 2048);
+        fsetpos(file, &index_position);
+        fseek(file, 5 + 3 * current_block, SEEK_CUR);
+        fread(data_block, 3, 1, file);
+        *data_block = to_big_endian(*data_block, 3);
+        fseek(file, 1024 + (file_desc->partition_pos + *data_block) * 2048, SEEK_SET);
+        unsigned offset = *file_size % 2048;
+        fseek(file, offset, SEEK_CUR);
+
+        // Write to data block
+        unsigned free_space = 2048 - offset;
+        unsigned remaining = nbytes - file_desc->bytes;
+        unsigned bytes_to_write = free_space;
+        if (remaining < free_space) {
+            bytes_to_write = remaining;
+        }
+        char* origin = buffer;
+        fwrite(origin + file_desc->bytes, 1, bytes_to_write, file);
+        file_desc->bytes += bytes_to_write;
+
+        // Update file size
+        *file_size += bytes_to_write;
+        *file_size = to_big_endian_long(*file_size, 5);
+        fsetpos(file, &index_position);
+        fwrite(file_size, 5, 1, file);
+
+        // Check completion
+        if (file_desc->bytes == nbytes) {
+            writing = false;
+        }
+    }
+
+    // Memory cleaning
+    free(file_size);
+    free(data_block);
+    fclose(file);
+
+    return file_desc->bytes;
 }
 
 // Close file
@@ -623,7 +755,6 @@ unsigned* find_partition() {
 
         // Checks valid bit and if block represents current partition
         if (valid && (partition_id == current_partition)) {
-
             // Get absolute position for partition
             fread(abs_id, 3, 1, file);
             partition_info[0] = to_big_endian(*abs_id, 3);
@@ -715,8 +846,50 @@ unsigned long to_big_endian_long(unsigned long n, int n_bytes) {
     return big_endian >> 8 * (8 - n_bytes);
 }
 
+// Reserve new block for data
+unsigned get_free_block(unsigned partition_start, unsigned partition_size, FILE* file) {
+    unsigned* buffer = calloc(1, sizeof(unsigned));
+
+    // Move to partition
+    fseek(file, 1024 + (partition_start + 1) * 2048, SEEK_SET);
+    fpos_t bitmap_pos; // Holds position for partition bitmaps
+    fgetpos(file, &bitmap_pos);
+    int bitmap_count = ceil((double) partition_size / 16384);
+
+    // Search for free block
+    unsigned free_block = 0;
+    for (int bitmap = 0; bitmap < bitmap_count; bitmap++) {
+        for (int byte = 0; byte < 2048; byte++) {
+            fread(buffer, 1, 1, file);
+            unsigned current_byte = *buffer;
+            for (int bit = 0; bit < 8; bit++) {
+                if (!((current_byte >> (7 - bit)) & 1)) {  // Update bitmap for index block
+                    free_block = bitmap * 16384 + byte * 8 + bit;
+                    fsetpos(file, &bitmap_pos);
+                    fseek(file, bitmap * 2048 + byte, SEEK_CUR);
+                    unsigned new_byte = (128 >> bit) | current_byte;
+                    fwrite(&new_byte, 1, 1, file);
+                    break;
+                }
+            }
+            if (free_block) {
+                break;
+            }
+        }
+        if (free_block) {
+            break;
+        }
+    }
+
+    if (!free_block) {
+        // TODO: No space available
+        printf("No space available!\n");
+    }
+    return free_block;
+}
+
 // Free memory for global variables
-void clean_vars() {
+void os_unmount() {
     if (disk_path != NULL) {
         free(disk_path);
     }
