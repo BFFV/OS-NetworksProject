@@ -394,6 +394,7 @@ osFile* os_open(char* filename, char mode) {
         stream->bytes = 0;
 
         // Free memory and return osFile
+        free(partition_info);
         free(buffer);
         fclose(file);
         return stream;
@@ -401,6 +402,9 @@ osFile* os_open(char* filename, char mode) {
     } else if (mode == 'r') {
         // TODO: Invalid filename
         printf("Invalid Filename!!\n");
+        free(buffer);
+        fclose(file);
+        return NULL;
     }
 
     // Create osFile for writing
@@ -495,7 +499,6 @@ int os_read(osFile* file_desc, void* buffer, int nbytes) {
     fsetpos(file, &index_position);
     fread(file_size, 5, 1, file);
     *file_size = to_big_endian_long(*file_size, 5);
-    unsigned block_count = floor((double) *file_size / 2048);
     unsigned bytes_read = 0;
 
     // Read loop
@@ -514,7 +517,7 @@ int os_read(osFile* file_desc, void* buffer, int nbytes) {
         // Read data block
         unsigned remaining_data = *file_size - file_desc->bytes;
         unsigned free_space = 2048 - offset;
-        unsigned remaining = nbytes - file_desc->bytes;
+        unsigned remaining = nbytes - bytes_read;
         unsigned bytes_to_read = free_space;
         if ((remaining < free_space) && (remaining <= remaining_data)) {
             bytes_to_read = remaining;
