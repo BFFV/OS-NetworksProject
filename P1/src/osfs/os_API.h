@@ -66,7 +66,7 @@ int os_rm(char* filename);
 unsigned* find_partition();
 
 // Display free & used blocks
-void count_bitmap_blocks(char* bitmap);
+int* count_bitmap_blocks(char* bitmap, int limit);
 
 // Sort valid partitions according to order in disk
 void sort_mbt(unsigned* partitions, unsigned* sizes, int n);
@@ -79,6 +79,9 @@ unsigned long to_big_endian_long(unsigned long n, int n_bytes);
 
 // Reserve new block for data
 unsigned get_free_block(unsigned partition_start, unsigned partition_size, FILE* file);
+
+// Get global variables
+char* get_diskname();
 
 // Free memory for global variables
 void os_unmount();

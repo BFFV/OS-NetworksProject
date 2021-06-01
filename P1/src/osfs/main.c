@@ -1,216 +1,253 @@
 #include "os_API.h"
 
-// Function to manage partitions
-void manage_partitions(char* disk_name) {
+// Declare functions
+void manage_partitions();
+void manage_this();
+void manage_files();
+int download_file(char* filename);
+int upload_file(char* filename, char* disk_filename);
 
-    // List available partitions
+// Manage partitions
+void manage_partitions() {
+
+    // List all available partitions
     os_mbt();
 
     // Ask for command
-    printf("Seleciona uno de los siguientes comandos:\n");
-    printf(">>> [select]    Monta la partición de id 'partition_id'\n");
-    printf(">>> [create]    Crear una nueva partición\n");
-    printf(">>> [delete]    Eliminar una de las particiones\n");
-    printf(">>> [reset]     Elimina las particiones de la MBT\n");
+    printf("\nSelect one of the following commands:\n\n");
+    printf(">>> [mount]     Mount a partition inside the disk\n");
+    printf(">>> [create]    Create a new partition inside the disk\n");
+    printf(">>> [delete]    Delete a partition from the disk\n");
+    printf(">>> [reset]     Delete all partitions from the disk\n");
+    printf(">>> [exit]      Exit program\n");
 
     // Read command
     char command[12];
+    printf("\n> Command: ");
     scanf("%s", command);
 
-    if (strcmp(command, "create")) {
-        printf(">>> Ingresa un id [int] y size [int] para la partición a crear ...\n");
+    // Create new partition
+    if (!strcmp(command, "create")) {
+        printf("\n>>> Enter an ID [int] and size [int] for the new partition...\n\n");
         int partition_id;
         int size;
-        scanf("ID: %d", partition_id);
-        scanf("Size: %d", size);
+        printf("> ID: ");
+        scanf("%d", &partition_id);
+        printf("> Size: ");
+        scanf("%d", &size);
         os_create_partition(partition_id, size);
-        manage_partitions(disk_name);
+        manage_partitions();
 
-    } else if (strcmp(command, "delete")) {
-        printf(">>> Ingresa el id [int] de la partición a eliminar ...\n");
+    } else if (!strcmp(command, "delete")) { // Delete partition
+        printf("\n>>> Enter the ID [int] of the partition to delete...\n\n");
         int partition_id;
-        scanf("ID: %d", partition_id);
+        printf("> ID: ");
+        scanf("%d", &partition_id);
         os_delete_partition(partition_id);
-        manage_partitions(disk_name);
+        manage_partitions();
 
-    } else if (strcmp(command, "reset")) {
-        printf(">>> Esto eliminará todos los datos en el disco, estás seguro??? ...\n");
+    } else if (!strcmp(command, "reset")) { // Reset disk partitions
+        printf("\n>>> This will delete all data from the disk, are you sure? (y/n)\n");
         char answer[1];
-        scanf("y/n: %s", answer);
-        if (strcmp(answer, "y")){
+        scanf("%s", answer);
+        if (!strcmp(answer, "y")) {
             reset_mbt();
         }
-        manage_partitions(disk_name);
+        manage_partitions();
 
-    } else {
-        bool is_number = true;
-        for (int d; d < 3; d++) {
-            if (!isdigit(command[d])){
-                is_number = false;
-            }
-        }
+    } else if (!strcmp(command, "mount")) { // Mount partition
+        printf("\n>>> Enter the ID [int] of the partition to mount...\n\n");
+        int partition_id;
+        printf("> ID: ");
+        scanf("%d", &partition_id);
+        char disk_path[strlen(get_diskname()) + 1];
+        strcpy(disk_path, get_diskname());
+        os_mount(disk_path, partition_id);
+        manage_this();
 
-        if (is_number){
-            os_mount(disk_name, (int) command);
-        }
+    } else if (!strcmp(command, "exit")) { // Exit
+        // Unmount disk & exit
+        os_unmount();
+        exit(0);
+    } else { // Invalid
+        manage_partitions();
     }
 }
 
-void manage_this(char* disk_name){
+// Manage specific partition
+void manage_this() {
 
     // Ask for command
-    printf("Seleciona uno de los siguientes comandos:\n");
-    printf(">>> [filename]  Chequea si el archivo 'filename' existe en la partición!\n");
-    printf(">>> [bitmap]    Muestra el BitMap de la partición\n");
-    printf(">>> [ls]        Muestra todos los archivos en la partición'\n");
-    printf(">>> [back]      Retroceder\n");
+    printf("\nSelect one of the following commands:\n\n");
+    printf(">>> [files]   Manage files in current partition\n");
+    printf(">>> [bitmap]  Displays current partition BitMap\n");
+    printf(">>> [ls]      Display all files in current partition\n");
+    printf(">>> [back]    Go back\n");
 
     // Read command
     char command[12];
-    scanf("%[^\n]%s", command);
+    printf("\n> Command: ");
+    scanf("%s", command);
 
-    if (strcmp(command, "ls")) {
+    // List files in partition
+    if (!strcmp(command, "ls")) {
         os_ls();
-        manage_this(disk_name);
+        manage_this();
 
-    } else if (strcmp(command, "bitmap")) {
-        printf(">>> Ingresa el número [int] del bitmap que quieres mostrar ([all] para mostrarlos todos)\n");
-        char bitmap[3];
-        scanf("%[^\n]%s", bitmap);
-        if (isdigit(bitmap[0])) {
-            os_bitmap((int) bitmap);
-        } else {
-            os_bitmap(0);
-        }
-        manage_this(disk_name);
+    } else if (!strcmp(command, "bitmap")) { // Display partition bitmap
+        printf("\n>>> Enter the BitMap number [int] (0 for ALL)...\n\n");
+        printf("> Bitmap: ");
+        int bitmap;
+        scanf("%d", &bitmap);
+        os_bitmap(bitmap);
+        manage_this();
 
-    } else if (strcmp(command, "back")) {
-        manage_partitions(disk_name);
+    } else if (!strcmp(command, "files")) { // Manage files
+        manage_files();
 
-    } else {
-        bool exists = os_exists(command);
-        if (!exists) {
-            printf("No existe archivo con ese nombre D: \n");
-            manage_this(disk_name);
-        }
-        printf("El archivo existe, deseas seleccionarlo????\n");
-        char answer[2];
-        scanf("y/n: %[^\n]%s", answer);
-        if (strcmp(answer, "y")) {// existing file options
-            existing_file_opt(disk_name, command);
-        } else if (strcmp(answer, "n")) {// non-existing file options
-            nonexistent_file_opt(disk_name, command);
-        }
+    } else if (!strcmp(command, "back")) { // Go back
+        manage_partitions();
+
+    } else { // Invalid
+        manage_this();
     }
 }
 
-void existing_file_opt(char* disk_name, char* filename){
-    
-    // Archivo que ya existe
-    printf("[%s] Seleciona uno de los siguientes comandos:\n");
-    printf(">>> [download]  Descargar archivo\n"); // read, open, close
-    printf(">>> [more]      Impreme en pantalla los detalles del archivo\n");
-    printf(">>> [rm]        Borrar archivo\n");
-    printf(">>> [back]      Retroceder\n");
+// Manage files inside partition
+void manage_files() {
 
-    char command[8];
-    scanf("%[^\n]%s", command);
-
-    // Download file to local (PC)
-    if (strcmp(command, "download")) {
-        char str[6 + strlen(filename) + 1];
-        sprintf(str, "files/%s", filename);
-        download_file(str);
-
-    // Show data inside disk file
-    } else if (strcmp(command, "more")) {
-        osFile* file = os_open(filename, 'r');
-        char text[256];
-        os_read(file, text, 256);
-        os_close(file);
-        existing_file_opt(disk_name, filename);
-
-    // Remove file
-    } else if (strcmp(command, "rm")) {
-        os_rm(filename);
-        manage_this(disk_name);
-
-    // Return to Manage Partition
-    } else {
-        manage_this(disk_name);
-    }
-}
-
-void nonexistent_file_opt(char* disk_name, char* filename){
-
-    // Crear nuevo archivo
-    printf("[%s] Seleciona uno de los siguientes comandos:\n", filename);
-    printf(">>> [create]  Crea un archivo con el nombre y agregale cosas xD\n"); // open
-    printf(">>> [load]    Carga una archivo al disco\n"); // write, open, close
-    printf(">>> [back]    Retroceder\n");
+    // Ask for command
+    printf("\nSelect one of the following commands:\n\n");
+    printf(">>> [create]    Create new text file\n");
+    printf(">>> [download]  Download file\n");
+    printf(">>> [upload]    Upload file\n");
+    printf(">>> [exists]    Check if file exists\n");
+    printf(">>> [rm]        Remove file\n");
+    printf(">>> [ls]        Display all files in current partition\n");
+    printf(">>> [back]      Go back\n");
 
     // Read command
-    char command[6];
-    scanf("%[^\n]%s", command);
-    if (strcmp(command, "back")) {
-        manage_this(disk_name);
+    char command[12];
+    printf("\n> Command: ");
+    scanf("%s", command);
 
-    // Create new disk file and put some text
-    } else if (strcmp(command, "create")) {
-        osFile* file = os_open(filename, 'w');
-        printf(">>> Ingresa el texto que quieres guardar...\n");
+    // Create new text file
+    if (!strcmp(command, "create")) {
+        printf("\n>>> Enter the filename and text separated by a space...\n\n");
+        char filename[256];
         char text[256];
-        scanf("%[^\n]%s", text);
+        printf("> File & Text: ");
+        scanf("%s %[^\n]s", filename, text);
+        osFile* file = os_open(filename, 'w');
         os_write(file, text, strlen(text));
         os_close(file);
-        existing_file_opt(disk_name, filename);
+        printf("\n>>> File created and data entered successfully!\n");
+        manage_files();
 
-    // Load 
-    } else if (strcmp(command, "load")) {
-        printf(">>> Ingresa el nombre de archivo que quieres subir...\n");
+    } else if (!strcmp(command, "download")) { // Download file
+        printf("\n>>> Enter the filename...\n\n");
+        char filename[256];
+        printf("> Filename: ");
+        scanf("%s", filename);
+        int error = download_file(filename);
+        if (!error) {
+            printf("\n>>> File downloaded successfully!\n");
+        }
+        manage_files();
 
+    } else if (!strcmp(command, "upload")) { // Upload file
+        printf("\n>>> Enter the path for the file you want to upload...\n\n");
         char pc_filename[256];
-        scanf("// %[^\n]%s", pc_filename);
-        upload_file(pc_filename, filename);
-        printf(" >>> Archivo subido con éxito!!!\n");
-        manage_this(disk_name);
-    }
+        printf("> Path: ");
+        scanf("%s", pc_filename);
+        printf("\n>>> Enter the filename you want to save it as...\n\n");
+        char filename[256];
+        printf("> Filename: ");
+        scanf("%s", filename);
+        int error = upload_file(pc_filename, filename);
+        if (!error) {
+            printf("\n>>> File uploaded successfully!!!\n");
+        }
+        manage_files();
 
+    } else if (!strcmp(command, "exists")) { // Check if file exists
+        printf("\n>>> Enter the name for the file you want to check...\n\n");
+        char pc_filename[256];
+        printf("> Filename: ");
+        scanf("%s", pc_filename);
+        bool exists = os_exists(pc_filename);
+        if (exists) {
+            printf("\nFile exists!\n");
+        } else {
+            printf("\nFile doesn't exist!\n");
+        }
+        manage_files();
+
+    } else if (!strcmp(command, "rm")) { // Remove file
+        printf("\n>>> Enter the name of the file you want to remove...\n\n");
+        char filename[28];
+        printf("> Filename: ");
+        scanf("%s", filename);
+        os_rm(filename);
+        manage_files();
+
+    } else if (!strcmp(command, "ls")) { // List files
+        os_ls();
+        manage_files();
+
+    } else if (!strcmp(command, "back")) { // Go back
+        manage_this();
+
+    } else { // Invalid
+        manage_files();
+    }
 }
 
 // Upload file to disk
-void upload_file(char* filename, char* disk_filename) {
+int upload_file(char* filename, char* disk_filename) {
     FILE* input = fopen(filename, "rb");
     char* buffer = calloc(4096, sizeof(char));
     osFile* file = os_open(disk_filename, 'w');
-    int bytes = 1;
-    size_t bytes_read = 0;
-    bool uploading = true;
-    while (uploading) {
-        bytes_read = fread(buffer, 1, 4096, input);
-        bytes = os_write(file, buffer, (int) bytes_read);
-        if ((bytes_read < 4096) || (!bytes)) {
-            uploading = false;
+    if (file != NULL) {
+        int bytes = 1;
+        size_t bytes_read = 0;
+        bool uploading = true;
+        while (uploading) {
+            bytes_read = fread(buffer, 1, 4096, input);
+            bytes = os_write(file, buffer, (int) bytes_read);
+            if ((bytes_read < 4096) || (!bytes)) {
+                uploading = false;
+            }
         }
     }
     os_close(file);
     free(buffer);
     fclose(input);
+    if (file != NULL) {
+        return 0;
+    }
+    return 1;
 }
 
 // Download file from disk
-void download_file(char* filename) {
+int download_file(char* filename) {
     FILE* output = fopen(filename, "w");
     char* buffer = calloc(4096, sizeof(char));
     osFile* file = os_open(filename, 'r');
-    int bytes = 1;
-    while (bytes) {
-        bytes = os_read(file, buffer, 4096);
-        fwrite(buffer, 1, bytes, output);
+    if (file != NULL) {
+        int bytes = 1;
+        while (bytes) {
+            bytes = os_read(file, buffer, 4096);
+            fwrite(buffer, 1, bytes, output);
+        }
     }
     os_close(file);
     free(buffer);
     fclose(output);
+    if (file != NULL) {
+        return 0;
+    }
+    return 1;
 }
 
 // OldSchool File System Demo
@@ -222,16 +259,15 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // mount disk
-    printf("Leyendo disco ...");
-    os_mount(argv[1], NULL);
+    // Mount disk
+    printf("Loading Disk...\n");
+    os_mount(argv[1], 0);
 
-    // First: all partitions
-    manage_partitions(argv[1]);
+    // First: All partitions
+    manage_partitions();
 
-    // Second: this partition [bitmap, os ls, os exists]
-    manage_this(argv[1]);
+    // Second: This partition [bitmap, os ls, os exists]
+    manage_this();
 
-    os_unmount();
     return 0;
 }

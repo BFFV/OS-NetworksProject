@@ -13,15 +13,24 @@ int current_partition; // Current partition where the disk is mounted
 
 // Mount disk into a specific partition
 void os_mount(char* diskname, int partition) {
+
+    // Assert (diskname exists(?) // valid partition [valid range, existing partition] )
+    if (partition < 0 || partition > 127) {
+        printf("\n>>> ValueError: index [%d] out of range!\n\n", partition);
+    }
+
     os_unmount();
     disk_path = calloc(strlen(diskname) + 1, sizeof(char));
     strcpy(disk_path, diskname);
     current_partition = partition;
+
+    // Success message
+    printf("\n>>> The partition [%d] has been successfully mounted!\n\n", partition);
 }
 
 // Display bitmap for current partition
 void os_bitmap(unsigned num) {
-    // TODO: Bonus: partition not found
+    // Errors: num not in range [0, 8]; disk not mounted.
 
     // Get partition
     unsigned* partition_info = find_partition();
@@ -34,14 +43,30 @@ void os_bitmap(unsigned num) {
     int bitmap_count = ceil((double) partition_info[1] / 16384);
     unsigned* buffer = calloc(1, sizeof(unsigned));
     char* bitmap_block = calloc(2048, sizeof(char));
+    unsigned total_used = 0;
+    unsigned total_free = 0;
 
     // Display bitmaps
-    if (!num) {
-        for (int bitmap = 0; bitmap < bitmap_count; bitmap++) {
+    for (int bitmap = 0; bitmap < bitmap_count; bitmap++) {
+        fsetpos(file, &position);
+        fseek(file, 2048 * bitmap, SEEK_CUR);
+
+        // Convert bytes to hex & count free blocks
+        fread(bitmap_block, 2048, 1, file);
+        int bits_to_read = 16384;
+        int remaining = partition_info[1] % 16384;
+        if ((bitmap == bitmap_count - 1) && (remaining)) {
+            bits_to_read = remaining;
+        }
+        int* block_data = count_bitmap_blocks(bitmap_block, bits_to_read);
+        total_used += block_data[0];
+        total_free += block_data[1];
+        if ((!num) || (num == bitmap + 1)) {
+            fprintf(stderr, GRN "\nBitmap Block %d\n", bitmap + 1);
+            fprintf(stderr, GRN "\nUsed Blocks: %u\n", block_data[0]);
+            fprintf(stderr, GRN "Free Blocks: %u\n\n", block_data[1]);
             fsetpos(file, &position);
             fseek(file, 2048 * bitmap, SEEK_CUR);
-
-            // Convert bytes to hex
             fprintf(stderr, GRN "\n0x\n");
             for (int byte = 0; byte < 2048; byte++) {
                 fread(buffer, 1, 1, file);
@@ -52,35 +77,12 @@ void os_bitmap(unsigned num) {
                     fprintf(stderr, "\n");
                 }
             }
-
-            // Count free blocks
-            fsetpos(file, &position);
-            fseek(file, 2048 * bitmap, SEEK_CUR);
-            fread(bitmap_block, 2048, 1, file);
-            count_bitmap_blocks(bitmap_block);
         }
-    } else {
-        fseek(file, 2048 * (num - 1), SEEK_CUR);
-
-        // Convert bytes to hex
-        fprintf(stderr, GRN "\n0x\n");
-        for (int byte = 0; byte < 2048; byte++) {
-            fread(buffer, 1, 1, file);
-            unsigned current_byte = *buffer;
-            fprintf(stderr, GRN "%X", current_byte >> 4);
-            fprintf(stderr, GRN "%X", current_byte & 15);
-            if (!((byte + 1) % 64)) {
-                fprintf(stderr, "\n");
-            }
-        }
-
-        // Count free blocks
-        fsetpos(file, &position);
-        fseek(file, 2048 * (num - 1), SEEK_CUR);
-        fread(bitmap_block, 2048, 1, file);
-        count_bitmap_blocks(bitmap_block);
+        free(block_data);
     }
 
+    fprintf(stderr, GRN "\n\nTotal Used Blocks in Partition: %u\n", total_used);
+    fprintf(stderr, GRN "Total Free Blocks in Partition: %u\n\n", total_free);
     fprintf(stdout, DEFAULT "\n");
 
     // Memory cleaning
@@ -293,6 +295,9 @@ void os_create_partition(int id, int size) {
     free(partition_header);
     free(abs_id);
     free(partition_size);
+
+    // Succes message
+    printf("\n>>> Partition of ID [%d] and size [%d] has been created...\n\n", id, size);
 }
 
 // Delete partition
@@ -324,6 +329,9 @@ void os_delete_partition(int id) {
     // Memory clean
     free(partition_header);
     fclose(file);
+
+    // Success message
+    printf("\n>>> The partition [%d] has been deleted...\n\n", id);
 }
 
 // Delete all partitions
@@ -340,6 +348,9 @@ void reset_mbt() {
 
     // Memory clean
     fclose(file);
+
+    // Success
+    printf("\n>>> The MBT has been successfully reset!\n");
 }
 
 // ----------- File Management Functions ----- //
@@ -735,6 +746,9 @@ int os_rm(char* filename) {
     free(buffer);
     free(partition_info);
     fclose(file);
+
+    // Success Message
+    printf("\n>>> File successfully deleted!\n");
     return 0;
 }
 
@@ -785,12 +799,17 @@ unsigned* find_partition() {
 }
 
 // Display free & used blocks
-void count_bitmap_blocks(char* bitmap) {
+int* count_bitmap_blocks(char* bitmap, int limit) {
     int used_blocks = 0;
     int free_blocks = 0;
-    for (int byte = 0; byte < 2048; byte++) {
+    int max_bytes = ceil((double) limit / 8);
+    for (int byte = 0; byte < max_bytes; byte++) {
         char current = bitmap[byte];
-        for (int bit = 0; bit < 8; bit++) {
+        int bit_limit = 8;
+        if ((byte == max_bytes - 1) && (limit % 8)) {
+            bit_limit = limit % 8;
+        }
+        for (int bit = 0; bit < bit_limit; bit++) {
             unsigned is_used = current & 1;
             if (is_used) {
                 used_blocks++;
@@ -801,8 +820,10 @@ void count_bitmap_blocks(char* bitmap) {
             current >>= 1;
         }
     }
-    fprintf(stderr, GRN "\n\nUsed Blocks: %u\n", used_blocks);
-    fprintf(stderr, GRN "Free Blocks: %u\n\n", free_blocks);
+    int* block_data = calloc(2, sizeof(int));
+    block_data[0] = used_blocks;
+    block_data[1] = free_blocks;
+    return block_data;
 }
 
 // Sort valid partitions according to order in disk
@@ -888,7 +909,14 @@ unsigned get_free_block(unsigned partition_start, unsigned partition_size, FILE*
         // TODO: No space available
         printf("No space available!\n");
     }
+
+    free(buffer);
     return free_block;
+}
+
+// Get global variables
+char* get_diskname() {
+    return disk_path;
 }
 
 // Free memory for global variables
