@@ -36,6 +36,9 @@ void manage_partitions() {
         printf("> Size: ");
         scanf("%d", &size);
         os_create_partition(partition_id, size);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
         manage_partitions();
 
     } else if (!strcmp(command, "delete")) { // Delete partition
@@ -44,6 +47,9 @@ void manage_partitions() {
         printf("> ID: ");
         scanf("%d", &partition_id);
         os_delete_partition(partition_id);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
         manage_partitions();
 
     } else if (!strcmp(command, "reset")) { // Reset disk partitions
@@ -63,10 +69,14 @@ void manage_partitions() {
         char disk_path[strlen(get_diskname()) + 1];
         strcpy(disk_path, get_diskname());
         os_mount(disk_path, partition_id);
-        manage_this();
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+            manage_partitions();
+        } else {
+            manage_this();
+        }
 
-    } else if (!strcmp(command, "exit")) { // Exit
-        // Unmount disk & exit
+    } else if (!strcmp(command, "exit")) { // Unmount disk & exit
         os_unmount();
         exit(0);
     } else { // Invalid
@@ -95,11 +105,14 @@ void manage_this() {
         manage_this();
 
     } else if (!strcmp(command, "bitmap")) { // Display partition bitmap
-        printf("\n>>> Enter the BitMap number [int] (0 for ALL)...\n\n");
+        printf("\n>>> Enter the Bitmap number [int] (0 for ALL)...\n\n");
         printf("> Bitmap: ");
         int bitmap;
         scanf("%d", &bitmap);
         os_bitmap(bitmap);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
         manage_this();
 
     } else if (!strcmp(command, "files")) { // Manage files
@@ -133,15 +146,22 @@ void manage_files() {
 
     // Create new text file
     if (!strcmp(command, "create")) {
-        printf("\n>>> Enter the filename and text separated by a space...\n\n");
+        printf("\n>>> Enter the filename and content (text) separated by a space...\n\n");
         char filename[256];
         char text[256];
         printf("> File & Text: ");
         scanf("%s %[^\n]s", filename, text);
         osFile* file = os_open(filename, 'w');
-        os_write(file, text, strlen(text));
-        os_close(file);
-        printf("\n>>> File created and data entered successfully!\n");
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        } else {
+            os_write(file, text, strlen(text));
+            if (OS_ERROR != NoError) {
+                os_strerror(OS_ERROR);
+            }
+            os_close(file);
+            printf("\n>>> File created and data entered successfully!\n");
+        }
         manage_files();
 
     } else if (!strcmp(command, "download")) { // Download file
@@ -178,6 +198,8 @@ void manage_files() {
         bool exists = os_exists(pc_filename);
         if (exists) {
             printf("\nFile exists!\n");
+        } else if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
         } else {
             printf("\nFile doesn't exist!\n");
         }
@@ -185,10 +207,13 @@ void manage_files() {
 
     } else if (!strcmp(command, "rm")) { // Remove file
         printf("\n>>> Enter the name of the file you want to remove...\n\n");
-        char filename[28];
+        char filename[256];
         printf("> Filename: ");
         scanf("%s", filename);
         os_rm(filename);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
         manage_files();
 
     } else if (!strcmp(command, "ls")) { // List files
@@ -208,25 +233,29 @@ int upload_file(char* filename, char* disk_filename) {
     FILE* input = fopen(filename, "rb");
     char* buffer = calloc(4096, sizeof(char));
     osFile* file = os_open(disk_filename, 'w');
-    if (file != NULL) {
-        int bytes = 1;
-        size_t bytes_read = 0;
-        bool uploading = true;
-        while (uploading) {
-            bytes_read = fread(buffer, 1, 4096, input);
-            bytes = os_write(file, buffer, (int) bytes_read);
-            if ((bytes_read < 4096) || (!bytes)) {
-                uploading = false;
-            }
+    if (OS_ERROR != NoError) {
+        os_strerror(OS_ERROR);
+        free(buffer);
+        fclose(input);
+        return 1;
+    }
+    int bytes = 1;
+    size_t bytes_read = 0;
+    bool uploading = true;
+    while (uploading) {
+        bytes_read = fread(buffer, 1, 4096, input);
+        bytes = os_write(file, buffer, (int) bytes_read);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
+        if ((bytes_read < 4096) || (!bytes)) {
+            uploading = false;
         }
     }
     os_close(file);
     free(buffer);
     fclose(input);
-    if (file != NULL) {
-        return 0;
-    }
-    return 1;
+    return 0;
 }
 
 // Download file from disk
@@ -234,20 +263,24 @@ int download_file(char* filename) {
     FILE* output = fopen(filename, "w");
     char* buffer = calloc(4096, sizeof(char));
     osFile* file = os_open(filename, 'r');
-    if (file != NULL) {
-        int bytes = 1;
-        while (bytes) {
-            bytes = os_read(file, buffer, 4096);
-            fwrite(buffer, 1, bytes, output);
+    if (OS_ERROR != NoError) {
+        os_strerror(OS_ERROR);
+        free(buffer);
+        fclose(output);
+        return 1;
+    }
+    int bytes = 1;
+    while (bytes) {
+        bytes = os_read(file, buffer, 4096);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
         }
+        fwrite(buffer, 1, bytes, output);
     }
     os_close(file);
     free(buffer);
     fclose(output);
-    if (file != NULL) {
-        return 0;
-    }
-    return 1;
+    return 0;
 }
 
 // OldSchool File System Demo
@@ -259,9 +292,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Mount disk
-    printf("Loading Disk...\n");
-    os_mount(argv[1], 0);
+    // Mount disk initially
+    printf("\nLoading Disk...\n");
+    os_mount(argv[1], -1);
+    if (OS_ERROR == DiskNotFound) {
+        os_strerror(OS_ERROR);
+        return 1;
+    }
 
     // First: All partitions
     manage_partitions();

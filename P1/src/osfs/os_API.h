@@ -6,13 +6,35 @@
 #pragma once
 
 
-// Manage files
+// Error handling
+typedef enum error {
+    NoError,                // no errors stored
+    DiskNotFound,           // invalid path to disk
+    NoSpaceAvailable,       // not enough space available for operation
+    NoBlocksAvailable,      // no blocks available for use in current partition
+    FileNotFound,           // file not found
+    FileExists,             // file already exists
+    MaxFileSizeReached,     // [w] max file size reached
+    PartitionNotFound,      // partition not in disk
+    PartitionOutOfRange,    // partition id/size out of range
+    PartitionExists,        // partition id already in use
+    NoDirectoryEntry,       // no directory entries available
+    InvalidBitmapIndex,     // bitmap index out of range
+    InvalidFileName,        // filename length > 28
+    InvalidFileMode,        // file open mode != ('w', 'r')
+    InvalidBytesNumber,     // negative number of bytes to read/write
+    BytesExceeded,          // [w] nbytes is larger than effectively read bytes
+} Error;
+
+extern Error OS_ERROR;
+
+// Struct to manage files
 typedef struct os_file {
-    char mode;  // Mode (Read/Write)
+    char mode;               // Mode (Read/Write)
     unsigned partition_pos;  // Absolute ID for partition (root directory)
-    unsigned partition_size;  // Size of partition (in blocks)
-    unsigned index_block;  // Index block for this file
-    unsigned bytes;  // Bytes currently read/written
+    unsigned partition_size; // Size of partition (in blocks)
+    unsigned index_block;    // Index block for this file
+    unsigned bytes;          // Bytes currently read/written
 } osFile;
 
 // ----------- General Functions ----------- //
@@ -85,3 +107,6 @@ char* get_diskname();
 
 // Free memory for global variables
 void os_unmount();
+
+// ----------- Bonus ----------- //
+void os_strerror(Error err);

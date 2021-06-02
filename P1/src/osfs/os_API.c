@@ -2,35 +2,59 @@
 
 #define RED "\e[0;31m"
 #define GRN "\e[0;32m"
+#define YEL "\e[0;33m"
 #define DEFAULT "\e[0m"
 
 // ----------- Global Variables ----------- //
 
 char* disk_path; // Path to current disk
+bool init = false; // Disk mounted initially
 int current_partition; // Current partition where the disk is mounted
+Error OS_ERROR; // Error handling
 
 // ----------- General Functions ----------- //
 
 // Mount disk into a specific partition
 void os_mount(char* diskname, int partition) {
 
-    // Assert (diskname exists(?) // valid partition [valid range, existing partition] )
-    if (partition < 0 || partition > 127) {
-        printf("\n>>> ValueError: index [%d] out of range!\n\n", partition);
+    // Check for existing disk
+    FILE* file = fopen(diskname, "rb");
+    if (file == NULL) {
+        OS_ERROR = DiskNotFound;
+        fclose(file);
+        return;
     }
+    fclose(file);
 
-    os_unmount();
-    disk_path = calloc(strlen(diskname) + 1, sizeof(char));
-    strcpy(disk_path, diskname);
-    current_partition = partition;
+    // Default mount
+    if (!init) {
+        disk_path = calloc(strlen(diskname) + 1, sizeof(char));
+        strcpy(disk_path, diskname);
+        init = true;
 
-    // Success message
-    printf("\n>>> The partition [%d] has been successfully mounted!\n\n", partition);
+    } else if (partition < 0 || partition > 127) { // Partition out of range
+        OS_ERROR = PartitionOutOfRange;
+
+    } else {
+        os_unmount();
+        disk_path = calloc(strlen(diskname) + 1, sizeof(char));
+        strcpy(disk_path, diskname);
+        int old_partition = current_partition;
+        current_partition = partition;
+
+        // PartitionNotFound: reset mounted partition
+        if (find_partition() == NULL) {
+            current_partition = old_partition;
+            return;
+        }
+
+        // Success message
+        printf("\n>>> The partition [%d] has been successfully mounted!\n\n", partition);
+    }
 }
 
 // Display bitmap for current partition
 void os_bitmap(unsigned num) {
-    // Errors: num not in range [0, 8]; disk not mounted.
 
     // Get partition
     unsigned* partition_info = find_partition();
@@ -41,6 +65,15 @@ void os_bitmap(unsigned num) {
     fpos_t position; // Holds position after partition directory
     fgetpos(file, &position);
     int bitmap_count = ceil((double) partition_info[1] / 16384);
+
+    // Invalid bitmap index
+    if (num > bitmap_count || num < 0) {
+        OS_ERROR = InvalidBitmapIndex;
+        fclose(file);
+        return;
+    }
+
+    // Assign memory buffers
     unsigned* buffer = calloc(1, sizeof(unsigned));
     char* bitmap_block = calloc(2048, sizeof(char));
     unsigned total_used = 0;
@@ -94,6 +127,13 @@ void os_bitmap(unsigned num) {
 
 // Check if file exists
 int os_exists(char* filename) {
+
+    // Check for valid filename
+    if (strlen(filename) > 28) {
+        OS_ERROR = InvalidFileName;
+        return 0;
+    }
+
     unsigned* partition_info = find_partition();
     FILE* file = fopen(disk_path, "rb");
     char* buffer = calloc(32, sizeof(char));
@@ -129,7 +169,8 @@ void os_ls() {
     unsigned* partition_info = find_partition();
     FILE* file = fopen(disk_path, "rb");
     unsigned* valid_buffer = calloc(1, sizeof(unsigned));
-    char* buffer = calloc(28, sizeof(char));
+    char* buffer = calloc(29, sizeof(char));
+    printf("\n");
 
     // 1024 skip MBT, partition_start * 2048 to partition directory
     fseek(file, 1024 + partition_info[0] * 2048, SEEK_SET);
@@ -161,7 +202,7 @@ void os_mbt() {
 
     FILE* file = fopen(disk_path, "rb");
 
-    printf("\n>> Valid Partitions\n\n");
+    printf("\n>> Valid Partitions\n");
     for (int entry = 0; entry < 128; entry++) {
         fseek(file, entry * 8, SEEK_SET);
         fread(partition_header, 1, 1, file);
@@ -187,8 +228,13 @@ void os_mbt() {
 }
 
 // Create new partitions
-void os_create_partition(int id, int size) {
-    // TODO: ID not in range, invalid size
+    void os_create_partition(int id, int size) {
+
+    // Invalid id/size
+    if ((id < 0 || id > 127) || (size < 16384 || size > 131072)) {
+        OS_ERROR = PartitionOutOfRange;
+        return;
+    }
 
     unsigned* partitions = malloc(128 * sizeof(unsigned));
     unsigned* sizes = malloc(128 * sizeof(unsigned));
@@ -214,8 +260,14 @@ void os_create_partition(int id, int size) {
 
             // ID already exists
             if (id == partition_id) {
-                //TODO: Error existing id
-                printf("F\n");
+                OS_ERROR = PartitionExists;
+                free(partitions);
+                free(sizes);
+                free(partition_header);
+                free(abs_id);
+                free(partition_size);
+                fclose(file);
+                return;
             }
 
             // Get absolute position for partition
@@ -284,11 +336,6 @@ void os_create_partition(int id, int size) {
         }
     }
 
-    // TODO: No space
-    if (searching) {
-        printf("F: No hay espacio\n");
-    }
-
     // Memory clean
     free(partitions);
     free(sizes);
@@ -296,16 +343,30 @@ void os_create_partition(int id, int size) {
     free(abs_id);
     free(partition_size);
 
-    // Succes message
-    printf("\n>>> Partition of ID [%d] and size [%d] has been created...\n\n", id, size);
+    // No space available
+    if (searching) {
+        OS_ERROR = NoSpaceAvailable;
+        return;
+    }
+
+    // Success message
+    printf("\n>>> Partition of ID [%d] and size [%d] has been created!\n\n", id, size);
 }
 
 // Delete partition
 void os_delete_partition(int id) {
+
+    // Check for valid partition id
+    if (id < 0 || id > 127) {
+        OS_ERROR = PartitionOutOfRange;
+        return;
+    }
+
     unsigned* partition_header = calloc(1, sizeof(unsigned));
 
     FILE* file = fopen(disk_path, "rb+");
     fpos_t position;
+    bool found = false;
 
     // Search for partition
     for (int entry = 0; entry < 128; entry++) {
@@ -323,6 +384,7 @@ void os_delete_partition(int id) {
         if (is_valid && partition_id == id) {
             fsetpos(file, &position);
             fwrite(&valid, 1, 1, file);
+            found = true;
         }
     }
 
@@ -330,8 +392,14 @@ void os_delete_partition(int id) {
     free(partition_header);
     fclose(file);
 
+    // Invalid partition id
+    if (!found) {
+        OS_ERROR = PartitionNotFound;
+        return;
+    }
+
     // Success message
-    printf("\n>>> The partition [%d] has been deleted...\n\n", id);
+    printf("\n>>> The partition [%d] has been deleted!\n\n", id);
 }
 
 // Delete all partitions
@@ -358,9 +426,21 @@ void reset_mbt() {
 // Open file
 osFile* os_open(char* filename, char mode) {
 
+    // Check for valid filename length
+    if (strlen(filename) > 28) {
+        OS_ERROR = InvalidFileName;
+        return NULL;
+    }
+
+    // Invalid mode
+    if (mode != 'w' || mode != 'r') {
+        OS_ERROR = InvalidFileMode;
+        return NULL;
+    }
+
     // Get partition
-    unsigned* partition_info = find_partition();
     FILE* file = fopen(disk_path, "rb+");
+    unsigned* partition_info = find_partition();
     unsigned* buffer = calloc(1, sizeof(unsigned));
     char* name_buffer = calloc(28, sizeof(char));
 
@@ -410,9 +490,9 @@ osFile* os_open(char* filename, char mode) {
         fclose(file);
         return stream;
 
-    } else if (mode == 'r') {
-        // TODO: Invalid filename
-        printf("Invalid Filename!!\n");
+    } else if (mode == 'r') { // File does not exist
+        OS_ERROR = FileNotFound;
+        free(partition_info);
         free(buffer);
         fclose(file);
         return NULL;
@@ -424,8 +504,9 @@ osFile* os_open(char* filename, char mode) {
         // Reserve block for index
         unsigned free_block = get_free_block(partition_info[0], partition_info[1], file);
         if (!free_block) {
-            // TODO: No space available
-            printf("No space available!\n");
+            free(partition_info);
+            free(buffer);
+            fclose(file);
             return NULL;
         }
 
@@ -441,10 +522,6 @@ osFile* os_open(char* filename, char mode) {
             fwrite(&filename[byte], 1, 1, file);
         }
         int filler_chars = 28 - strlen(filename);
-        if (filler_chars < 0) {
-            // TODO: Filename too long
-            printf("Filename too long!\n");
-        }
         unsigned empty = 0;
         for (int byte = 0; byte < filler_chars; byte++) {
             fwrite(&empty, 1, 1, file);
@@ -474,26 +551,32 @@ osFile* os_open(char* filename, char mode) {
         return stream;
 
     } else if (file_found) {
-        // TODO: File already exists
-        printf("File already exists!\n");
+        OS_ERROR = FileExists;
+
     } else if (new_entry < 0) {
-        // TODO: Directory full
-        printf("Directory for this partition is full!\n");
+        OS_ERROR = NoDirectoryEntry;
     }
+
     free(partition_info);
+    free(buffer);
+    fclose(file);
     return NULL;
 }
 
 // Read file
 int os_read(osFile* file_desc, void* buffer, int nbytes) {
 
-    // TODO: osFile is in write mode
+    // Check osFile with correct mode
     if (file_desc->mode != 'r') {
-        printf("File must be in 'read' mode!\n");
+        OS_ERROR = InvalidFileMode;
         return 0;
     }
 
-    // TODO: nbytes is negative
+    // Check positive nbytes
+    if (nbytes < 0) {
+        OS_ERROR = InvalidBytesNumber;
+        return 0;
+    }
 
     // Move to index block for file
     FILE* file = fopen(disk_path, "rb");
@@ -551,19 +634,27 @@ int os_read(osFile* file_desc, void* buffer, int nbytes) {
     free(data_block);
     fclose(file);
 
+    if (bytes_read < nbytes) {
+        OS_ERROR = BytesExceeded;
+    }
+
     return bytes_read;
 }
 
 // Write file
 int os_write(osFile* file_desc, void* buffer, int nbytes) {
 
-    // TODO: osFile is in read mode
+    // osFile is in read mode
     if (file_desc->mode != 'w') {
-        printf("File must be in 'write' mode!\n");
+        OS_ERROR = InvalidFileMode;
         return 0;
     }
 
-    // TODO: nbytes is negative
+    // Check positive nbytes
+    if (nbytes < 0) {
+        OS_ERROR = InvalidBytesNumber;
+        return 0;
+    }
 
     // Move to index block for file
     FILE* file = fopen(disk_path, "rb+");
@@ -590,18 +681,21 @@ int os_write(osFile* file_desc, void* buffer, int nbytes) {
 
             // Get block count
             unsigned block_count = *file_size / 2048;
-            if (block_count == 681) {
-                // TODO: Max file size reached!
-                // TODO: free memory
-                break;
+            if (block_count == 681) { // Max file size reached
+                OS_ERROR = MaxFileSizeReached;
+                free(file_size);
+                free(data_block);
+                fclose(file);
+                return file_desc->bytes;
             }
 
             // Get new data block
             unsigned new_block = get_free_block(file_desc->partition_pos, file_desc->partition_size, file);
-            if (!new_block){
-                // TODO: NO space
-                printf("No space available!\n");
-                break;
+            if (!new_block) {
+                free(file_size);
+                free(data_block);
+                fclose(file);
+                return file_desc->bytes;
             }
 
             // Create pointer to new data block
@@ -648,6 +742,10 @@ int os_write(osFile* file_desc, void* buffer, int nbytes) {
     free(file_size);
     free(data_block);
     fclose(file);
+
+    if (file_desc->bytes < nbytes) {
+        OS_ERROR = BytesExceeded;
+    }
 
     return file_desc->bytes;
 }
@@ -733,33 +831,43 @@ int os_rm(char* filename) {
             fwrite(&new_byte, 1, 1, file);
         }
 
+        // Memory cleaning
+        free(partition_info);
+        free(name_buffer);
         free(file_size);
         free(p_buffer);
+        free(buffer);
+        fclose(file);
 
-    } else {
-        // TODO: Filename not found
-        printf("Filename not found!\n");
+        // Success Message
+        printf("\n>>> File successfully deleted!\n");
+        return 0;
+
     }
 
+    // Set error for non existent file
+    OS_ERROR = FileNotFound;
+
     // Memory cleaning
+    free(partition_info);
     free(name_buffer);
     free(buffer);
-    free(partition_info);
     fclose(file);
-
-    // Success Message
-    printf("\n>>> File successfully deleted!\n");
-    return 0;
+    return 1;
 }
 
 // ----------- Utils ----------- //
 
 // Find location & size for current partition
 unsigned* find_partition() {
+
+    // Assign memory buffers
     unsigned* partition_info = malloc(2 * sizeof(unsigned));
     unsigned* partition_header = calloc(1, sizeof(unsigned));
     unsigned* abs_id = calloc(1, sizeof(unsigned));
     unsigned* partition_size = calloc(1, sizeof(unsigned));
+
+    // Try to open disk_path file
     FILE* file = fopen(disk_path, "rb");
 
     for (int entry = 0; entry < 128; entry++) {
@@ -789,12 +897,14 @@ unsigned* find_partition() {
         }
     }
 
+    // Memory cleaning
     free(partition_header);
     free(abs_id);
     free(partition_size);
     fclose(file);
 
-    // TODO: Partición no encontrada
+    // Partition not found
+    OS_ERROR = PartitionNotFound;
     return NULL;
 }
 
@@ -905,11 +1015,12 @@ unsigned get_free_block(unsigned partition_start, unsigned partition_size, FILE*
         }
     }
 
+    // Check for available free blocks (free_blocks > 0)
     if (!free_block) {
-        // TODO: No space available
-        printf("No space available!\n");
+        OS_ERROR = NoBlocksAvailable;
     }
 
+    // Memory cleaning
     free(buffer);
     return free_block;
 }
@@ -923,5 +1034,62 @@ char* get_diskname() {
 void os_unmount() {
     if (disk_path != NULL) {
         free(disk_path);
+        return;
     }
+    OS_ERROR = DiskNotFound;
+}
+
+// Bonus
+void os_strerror(Error err) {
+    switch (err) {
+    case DiskNotFound:
+        fprintf(stderr, RED "\nERROR: Disk Not Found!\n");
+        break;
+    case NoSpaceAvailable:
+        fprintf(stderr, RED "\nERROR: No space available in disk!\n");
+        break;
+    case NoBlocksAvailable:
+        fprintf(stderr, RED "\nERROR: No blocks available in partition!\n");
+        break;
+    case FileNotFound:
+        fprintf(stderr, RED "\nERROR: File not found!\n");
+        break;
+    case FileExists:
+        fprintf(stderr, RED "\nERROR: File already exists!\n");
+        break;
+    case MaxFileSizeReached:
+        fprintf(stderr, YEL "\nWARNING: Max file size reached during operation!\n");
+        break;
+    case PartitionNotFound:
+        fprintf(stderr, RED "\nERROR: Partition Not Found!\n");
+        break;
+    case PartitionOutOfRange:
+        fprintf(stderr, RED "\nERROR: Partition ID/Size Out of Range!\n");
+        break;
+    case PartitionExists:
+        fprintf(stderr, RED "\nERROR: Partition already exists!\n");
+        break;
+    case NoDirectoryEntry:
+        fprintf(stderr, RED "\nERROR: No entries available in partition directory!\n");
+        break;
+    case InvalidBitmapIndex:
+        fprintf(stderr, RED "\nERROR: Invalid Bitmap Index!\n");
+        break;
+    case InvalidFileName:
+        fprintf(stderr, RED "\nERROR: Filename Too Long!\n");
+        break;
+    case InvalidFileMode:
+        fprintf(stderr, RED "\nERROR: Action is not allowed by file mode!\n");
+        break;
+    case InvalidBytesNumber:
+        fprintf(stderr, RED "\nERROR: Invalid number of bytes to read!\n");
+        break;
+    case BytesExceeded:
+        fprintf(stderr, YEL "\nWARNING: Bytes to read/write exceed the maximum amount!\n");
+        break;
+    default:
+        break;
+    }
+
+    OS_ERROR = NoError;
 }
