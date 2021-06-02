@@ -457,6 +457,7 @@ osFile* os_open(char* filename, char mode) {
     for (int entry = 0; entry < 64; entry++) {
         fsetpos(file, &position);
         fseek(file, entry * 32, SEEK_CUR);
+        *buffer = 0;
         fread(buffer, 1, 1, file);
         if (*buffer) {
             fread(buffer, 3, 1, file);
@@ -1086,7 +1087,7 @@ void os_strerror(Error err) {
         fprintf(stderr, RED "\nFileIOError: File already exists!\n");
         break;
     case BytesExceeded:
-        fprintf(stderr, YEL "\nWARNING: Bytes to read/write exceed the maximum amount!\n");
+        fprintf(stderr, YEL "\nWARNING: Effective number of bytes read/written is different from nbytes!\n");
         break;
     case MaxFileSizeReached:
         fprintf(stderr, YEL "\nWARNING: Max file size reached during operation!\n");

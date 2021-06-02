@@ -19,6 +19,7 @@ void manage_partitions() {
     printf(">>> [create]    Create a new partition inside the disk\n");
     printf(">>> [delete]    Delete a partition from the disk\n");
     printf(">>> [reset]     Delete all partitions from the disk\n");
+    printf(">>> [fill]      Fill disk with partitions\n");
     printf(">>> [exit]      Exit program\n");
 
     // Read command
@@ -79,6 +80,25 @@ void manage_partitions() {
     } else if (!strcmp(command, "exit")) { // Unmount disk & exit
         os_unmount();
         exit(0);
+
+    } else if (!strcmp(command, "fill")) { // Fill disk for testing
+        printf("\n>>> Enter the Size [int] of each partition...\n\n");
+        int size;
+        printf("> Size: ");
+        scanf("%d", &size);
+        printf("\n>>> Creating partitions of size %d blocks...\n\n", size);
+        int partition_id = 1;
+        while (true) {
+            os_create_partition(partition_id, size);
+            if (OS_ERROR != NoError) {
+                os_strerror(OS_ERROR);
+                break;
+            }
+            fprintf(stdout, GRN " >#: Partition %d created without errors!\n", partition_id);
+            partition_id++;
+        }
+        manage_partitions();
+
     } else { // Invalid
         manage_partitions();
     }
@@ -92,6 +112,7 @@ void manage_this() {
     printf(">>> [files]   Manage files in current partition\n");
     printf(">>> [bitmap]  Displays current partition BitMap\n");
     printf(">>> [ls]      Display all files in current partition\n");
+    printf(">>> [fill]    Fill partition with files\n");
     printf(">>> [back]    Go back\n");
 
     // Read command
@@ -121,6 +142,26 @@ void manage_this() {
     } else if (!strcmp(command, "back")) { // Go back
         manage_partitions();
 
+    } else if (!strcmp(command, "fill")) { // Fill partition for testing
+        printf("\n>>> Enter the path to the file you want to fill the disk with...\n\n");
+        char pc_filename[256];
+        printf("> Path: ");
+        scanf("%s", pc_filename);
+        int file_id = 1;
+        char str_id[2];
+        while (true) {
+            char filename[28] = "fill";
+            sprintf(str_id, "%d", file_id);
+            strcat(filename, str_id);
+            if (upload_file(pc_filename, filename)) {
+                break;
+            }
+            fprintf(stdout, GRN " >#: File %d created without errors!\n", file_id);
+            fprintf(stdout, DEFAULT "");
+            file_id++;
+        }
+        manage_this();
+
     } else { // Invalid
         manage_this();
     }
@@ -137,6 +178,7 @@ void manage_files() {
     printf(">>> [exists]    Check if file exists\n");
     printf(">>> [rm]        Remove file\n");
     printf(">>> [ls]        Display all files in current partition\n");
+    printf(">>> [fileTest]  Try to write to a file opened in the wrong mode\n");
     printf(">>> [back]      Go back\n");
 
     // Read command
@@ -225,6 +267,37 @@ void manage_files() {
 
     } else if (!strcmp(command, "back")) { // Go back
         manage_this();
+
+    } else if (!strcmp(command, "fileTest")) {
+        char filename[256];
+        printf("\n>>> Enter the filename...\n\n");
+        printf("> Filename: ");
+        scanf("%s", filename);
+        int nbytes;
+        printf("\n>>> Enter number of bytes to write...\n\n");
+        printf("> nBytes: ");
+        scanf("%d", &nbytes);
+
+        // Open and try to write/read file
+        osFile* file = os_open(filename, 'w');
+
+        // Test write with selected mode
+        char buffer[256];
+
+        // Test read with selected mode
+        printf("\n>>> Trying to read from file...\n\n");
+        os_read(file, buffer, nbytes);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
+
+        printf("\n>>> Trying to write on file...\n\n");
+        os_write(file, buffer, nbytes);
+        if (OS_ERROR != NoError) {
+            os_strerror(OS_ERROR);
+        }
+        os_close(file);
+        manage_files();
 
     } else { // Invalid
         manage_files();

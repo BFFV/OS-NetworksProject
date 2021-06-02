@@ -27,5 +27,17 @@
 27) Bitmap: 0 (ALL)
 28) Files + Remove: zelda.mp3 + ls + Go back + Bitmap: 0 (ALL)
 29) Go back
-30) Exit
-31) Demo Errors (NoSpaceAvailable, NoBlocksAvailable, InvalidFileMode, InvalidBytesNumber, NoDirectoryEntry)
+30) Fill: Size 131072
+31) Create: ID 0, Size 131072 (NoSpaceAvailable)
+32) Mount: ID 1
+33) Fill: files/test.txt (NoDirectoryEntry)
+34) Go back + reset + Fill: Size 16384 + Mount: ID 1
+35) Fill: files/mercedes_benz.mp4 (NoBlocksAvailable)
+36) Go back + Mount: ID 2
+37) files -> fileTest con nbytes < 0 (InvalidFileMode, InvalidBytesNumber)
+38) Go back to start + Exit
+
+
+
+
+Exit
