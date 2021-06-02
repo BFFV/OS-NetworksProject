@@ -1,0 +1,31 @@
+1) Poner path disco malo
+2) Poner path bueno (disks/simdiskformat.bin)
+3) Mount: ID menor a 0 y mayor a 127, ID 0 (no debería existir)
+4) Delete: ID menor a 0 y mayor a 127, Delete: ID menor a 0 y mayor a 127
+5) Mostrar Reset con yes y no
+6) Create: ID menor a 0, size menor a 16384
+7) Create: ID 0, Size 131072
+8) Create: ID 0 (ya existe)
+9) Mount: ID 0 (correcto)
+10) ls
+11) Bitmap: Index menor a 0 y mayor a 8
+12) Bitmap: 1 y 0 (ALL)
+13) Files
+14) Create: nombre de más de 28 chars
+15) Exists: test.txt
+16) Create: test.txt Hola. + ls
+17) Create: test.txt Esto no va a funcionar. + ls (no válido)
+18) Exists: test.txt
+19) Remove: test.txt + ls
+20) Remove: test.txt
+21) Download: test.txt
+22) Mostrar files/Gerudo.mp3
+23) Upload: files/Gerudo.mp3 -> zelda.mp3 + ls
+24) Download: zelda.mp3 + mostrar audio cortado
+25) Upload: files/P1.pdf -> P1.pdf + ls
+26) Download: P1.pdf + mostrar pdf + go back
+27) Bitmap: 0 (ALL)
+28) Files + Remove: zelda.mp3 + ls + Go back + Bitmap: 0 (ALL)
+29) Go back
+30) Exit
+31) Demo Errors (NoSpaceAvailable, NoBlocksAvailable, InvalidFileMode, InvalidBytesNumber, NoDirectoryEntry)

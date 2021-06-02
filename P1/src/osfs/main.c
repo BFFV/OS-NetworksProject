@@ -160,7 +160,8 @@ void manage_files() {
                 os_strerror(OS_ERROR);
             }
             os_close(file);
-            printf("\n>>> File created and data entered successfully!\n");
+            fprintf(stdout, GRN "\n>>> File created and data entered successfully!\n");
+            fprintf(stdout, DEFAULT "");
         }
         manage_files();
 
@@ -171,7 +172,8 @@ void manage_files() {
         scanf("%s", filename);
         int error = download_file(filename);
         if (!error) {
-            printf("\n>>> File downloaded successfully!\n");
+            fprintf(stdout, GRN "\n>>> File downloaded successfully!\n");
+            fprintf(stdout, DEFAULT "");
         }
         manage_files();
 
@@ -186,7 +188,8 @@ void manage_files() {
         scanf("%s", filename);
         int error = upload_file(pc_filename, filename);
         if (!error) {
-            printf("\n>>> File uploaded successfully!!!\n");
+            fprintf(stdout, GRN "\n>>> File uploaded successfully!!!\n");
+            fprintf(stdout, DEFAULT "");
         }
         manage_files();
 
@@ -295,7 +298,7 @@ int main(int argc, char** argv) {
     // Mount disk initially
     printf("\nLoading Disk...\n");
     os_mount(argv[1], -1);
-    if (OS_ERROR == DiskNotFound) {
+    if (OS_ERROR != NoError) {
         os_strerror(OS_ERROR);
         return 1;
     }

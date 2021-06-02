@@ -1,10 +1,5 @@
 #include "os_API.h"
 
-#define RED "\e[0;31m"
-#define GRN "\e[0;32m"
-#define YEL "\e[0;33m"
-#define DEFAULT "\e[0m"
-
 // ----------- Global Variables ----------- //
 
 char* disk_path; // Path to current disk
@@ -21,7 +16,6 @@ void os_mount(char* diskname, int partition) {
     FILE* file = fopen(diskname, "rb");
     if (file == NULL) {
         OS_ERROR = DiskNotFound;
-        fclose(file);
         return;
     }
     fclose(file);
@@ -43,13 +37,16 @@ void os_mount(char* diskname, int partition) {
         current_partition = partition;
 
         // PartitionNotFound: reset mounted partition
-        if (find_partition() == NULL) {
+        unsigned* partition_info = find_partition();
+        if (partition_info == NULL) {
             current_partition = old_partition;
             return;
         }
+        free(partition_info);
 
         // Success message
-        printf("\n>>> The partition [%d] has been successfully mounted!\n\n", partition);
+        fprintf(stdout, GRN "\n>>> The partition [%d] has been successfully mounted!\n\n", partition);
+        fprintf(stdout, DEFAULT "");
     }
 }
 
@@ -69,6 +66,7 @@ void os_bitmap(unsigned num) {
     // Invalid bitmap index
     if (num > bitmap_count || num < 0) {
         OS_ERROR = InvalidBitmapIndex;
+        free(partition_info);
         fclose(file);
         return;
     }
@@ -228,7 +226,7 @@ void os_mbt() {
 }
 
 // Create new partitions
-    void os_create_partition(int id, int size) {
+void os_create_partition(int id, int size) {
 
     // Invalid id/size
     if ((id < 0 || id > 127) || (size < 16384 || size > 131072)) {
@@ -350,7 +348,8 @@ void os_mbt() {
     }
 
     // Success message
-    printf("\n>>> Partition of ID [%d] and size [%d] has been created!\n\n", id, size);
+    fprintf(stdout, GRN "\n>>> Partition of ID [%d] and size [%d] has been created!\n\n", id, size);
+    fprintf(stdout, DEFAULT "");
 }
 
 // Delete partition
@@ -399,7 +398,8 @@ void os_delete_partition(int id) {
     }
 
     // Success message
-    printf("\n>>> The partition [%d] has been deleted!\n\n", id);
+    fprintf(stdout, GRN "\n>>> The partition [%d] has been deleted!\n\n", id);
+    fprintf(stdout, DEFAULT "");
 }
 
 // Delete all partitions
@@ -418,7 +418,8 @@ void reset_mbt() {
     fclose(file);
 
     // Success
-    printf("\n>>> The MBT has been successfully reset!\n");
+    fprintf(stdout, GRN "\n>>> The MBT has been successfully reset!\n");
+    fprintf(stdout, DEFAULT "");
 }
 
 // ----------- File Management Functions ----- //
@@ -433,7 +434,7 @@ osFile* os_open(char* filename, char mode) {
     }
 
     // Invalid mode
-    if (mode != 'w' || mode != 'r') {
+    if (mode != 'w' && mode != 'r') {
         OS_ERROR = InvalidFileMode;
         return NULL;
     }
@@ -840,7 +841,9 @@ int os_rm(char* filename) {
         fclose(file);
 
         // Success Message
-        printf("\n>>> File successfully deleted!\n");
+        fprintf(stdout, GRN "\n>>> File successfully deleted!\n");
+        fprintf(stdout, DEFAULT "");
+
         return 0;
 
     }
@@ -901,6 +904,7 @@ unsigned* find_partition() {
     free(partition_header);
     free(abs_id);
     free(partition_size);
+    free(partition_info);
     fclose(file);
 
     // Partition not found
@@ -1043,53 +1047,55 @@ void os_unmount() {
 void os_strerror(Error err) {
     switch (err) {
     case DiskNotFound:
-        fprintf(stderr, RED "\nERROR: Disk Not Found!\n");
+        fprintf(stderr, RED "\nIOError: Disk Not Found!\n");
         break;
     case NoSpaceAvailable:
-        fprintf(stderr, RED "\nERROR: No space available in disk!\n");
+        fprintf(stderr, RED "\nIOError: No space available in disk!\n");
         break;
     case NoBlocksAvailable:
-        fprintf(stderr, RED "\nERROR: No blocks available in partition!\n");
-        break;
-    case FileNotFound:
-        fprintf(stderr, RED "\nERROR: File not found!\n");
-        break;
-    case FileExists:
-        fprintf(stderr, RED "\nERROR: File already exists!\n");
-        break;
-    case MaxFileSizeReached:
-        fprintf(stderr, YEL "\nWARNING: Max file size reached during operation!\n");
-        break;
-    case PartitionNotFound:
-        fprintf(stderr, RED "\nERROR: Partition Not Found!\n");
-        break;
-    case PartitionOutOfRange:
-        fprintf(stderr, RED "\nERROR: Partition ID/Size Out of Range!\n");
-        break;
-    case PartitionExists:
-        fprintf(stderr, RED "\nERROR: Partition already exists!\n");
+        fprintf(stderr, RED "\nIOError: No blocks available in partition!\n");
         break;
     case NoDirectoryEntry:
-        fprintf(stderr, RED "\nERROR: No entries available in partition directory!\n");
+        fprintf(stderr, RED "\nIOError: No entries available in partition directory!\n");
+        break;
+    case PartitionNotFound:
+        fprintf(stderr, RED "\nInvalidPartitionError: Partition Not Found!\n");
+        break;
+    case PartitionExists:
+        fprintf(stderr, RED "\nInvalidPartitionError: Partition already exists!\n");
+        break;
+    case PartitionOutOfRange:
+        fprintf(stderr, RED "\nIndexError: Partition ID/Size Out of Range!\n");
         break;
     case InvalidBitmapIndex:
-        fprintf(stderr, RED "\nERROR: Invalid Bitmap Index!\n");
+        fprintf(stderr, RED "\nIndexError: Invalid Bitmap Index!\n");
         break;
     case InvalidFileName:
-        fprintf(stderr, RED "\nERROR: Filename Too Long!\n");
-        break;
-    case InvalidFileMode:
-        fprintf(stderr, RED "\nERROR: Action is not allowed by file mode!\n");
+        fprintf(stderr, RED "\nInvalidInputError: Filename Too Long!\n");
         break;
     case InvalidBytesNumber:
-        fprintf(stderr, RED "\nERROR: Invalid number of bytes to read!\n");
+        fprintf(stderr, RED "\nInvalidInputError: Invalid number of bytes to read/write!\n");
+        break;
+    case InvalidFileMode:
+        fprintf(stderr, RED "\nFileIOError: Action is not allowed by file mode!\n");
+        break;
+    case FileNotFound:
+        fprintf(stderr, RED "\nFileIOError: File not found!\n");
+        break;
+    case FileExists:
+        fprintf(stderr, RED "\nFileIOError: File already exists!\n");
         break;
     case BytesExceeded:
         fprintf(stderr, YEL "\nWARNING: Bytes to read/write exceed the maximum amount!\n");
+        break;
+    case MaxFileSizeReached:
+        fprintf(stderr, YEL "\nWARNING: Max file size reached during operation!\n");
         break;
     default:
         break;
     }
 
+    // Reset
+    fprintf(stderr, DEFAULT "");
     OS_ERROR = NoError;
 }

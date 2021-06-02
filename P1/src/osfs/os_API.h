@@ -5,6 +5,11 @@
 #include <math.h>
 #pragma once
 
+// Colors
+#define RED "\e[0;31m"
+#define GRN "\e[0;32m"
+#define YEL "\e[0;33m"
+#define DEFAULT "\e[0m"
 
 // Error handling
 typedef enum error {
