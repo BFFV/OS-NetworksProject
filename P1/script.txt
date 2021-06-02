@@ -1,8 +1,8 @@
 1) Poner path disco malo
 2) Poner path bueno (disks/simdiskformat.bin)
 3) Mount: ID menor a 0 y mayor a 127, ID 0 (no debería existir)
-4) Delete: ID menor a 0 y mayor a 127, Delete: ID menor a 0 y mayor a 127
-5) Mostrar Reset con yes y no
+4) Delete: ID menor a 0 y mayor a 127
+5) Mostrar Reset con yes (no hace nada)
 6) Create: ID menor a 0, size menor a 16384
 7) Create: ID 0, Size 131072
 8) Create: ID 0 (ya existe)
@@ -26,7 +26,7 @@
 26) Download: P1.pdf + mostrar pdf + go back
 27) Bitmap: 0 (ALL)
 28) Files + Remove: zelda.mp3 + ls + Go back + Bitmap: 0 (ALL)
-29) Go back
+29) Go back + mostrar Reset
 30) Fill: Size 131072
 31) Create: ID 0, Size 131072 (NoSpaceAvailable)
 32) Mount: ID 1
