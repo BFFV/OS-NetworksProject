@@ -36,8 +36,3 @@
 36) Go back + Mount: ID 2
 37) files -> fileTest con nbytes < 0 (InvalidFileMode, InvalidBytesNumber)
 38) Go back to start + Exit
-
-
-
-
-Exit
