@@ -778,6 +778,7 @@ int os_rm(char* filename) {
     for (int entry = 0; entry < 64; entry++) {
         fsetpos(file, &position);
         fseek(file, entry * 32, SEEK_CUR);
+        *buffer = 0;
         fread(buffer, 1, 1, file);
         if (*buffer) {
             fread(buffer, 3, 1, file);

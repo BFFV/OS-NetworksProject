@@ -87,7 +87,7 @@ void manage_partitions() {
         printf("> Size: ");
         scanf("%d", &size);
         printf("\n>>> Creating partitions of size %d blocks...\n\n", size);
-        int partition_id = 1;
+        int partition_id = 0;
         while (true) {
             os_create_partition(partition_id, size);
             if (OS_ERROR != NoError) {
