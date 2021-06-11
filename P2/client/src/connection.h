@@ -13,4 +13,5 @@
 #include <errno.h>
 #include "communication.h"
 
-int prepare_socket(char * IP, int PORT);
+// Connect to server
+int prepare_socket(char* IP, int PORT);

@@ -1,40 +1,21 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "communication.h"
 #include "connection.h"
+#include "game.h"
 
-char * revert(char * message){
-  //Se invierte el mensaje
 
-  int len = strlen(message) + 1;
-  char * response = malloc(len);
+// Monster Hunter Server
+int main(int argc, char* argv[]) {
 
-  for (int i = 0; i < len-1; i++)
-  {
-    response[i] = message[len-2-i];
-  }
-  response[len-1] = '\0';
-  return response;
-}
+  // Initialize server
+  int server = init_server(argv[2], atoi(argv[4])); // Receives IP & PORT
 
-int main(int argc, char *argv[]){
-  // Se define una IP y un puerto
-  char * IP = "0.0.0.0";
-  int PORT = 8080;
-
-  // Se crea el servidor y se obtienen los sockets de ambos clientes.
-  PlayersInfo * players_info = prepare_sockets_and_get_clients(IP, PORT);
-
-  // Le enviamos al primer cliente un mensaje de bienvenida
-  char * welcome = "Bienvenido Cliente 1!!";
-  server_send_message(players_info->socket_c1, 1, welcome);
+  // Start waiting lobby
+  lobby(server);
 
   // Guardaremos los sockets en un arreglo e iremos alternando a quién escuchar.
+  /*
   int sockets_array[2] = {players_info->socket_c1, players_info->socket_c2};
   int my_attention = 0;
-  while (1)
-  {
+  while (1) {
     // Se obtiene el paquete del cliente 1
     int msg_code = server_receive_id(sockets_array[my_attention]);
 
@@ -60,6 +41,6 @@ int main(int argc, char *argv[]){
     }
     printf("------------------\n");
   }
-
+  */
   return 0;
 }
