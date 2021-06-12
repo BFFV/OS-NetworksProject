@@ -25,7 +25,7 @@ Character* create_character(Class type) {
             character->abilities[2] = DISTRAER;
 
             character->max_hp = 5000;
-            character->current_hp = 5000;
+            character->current_hp = character->max_hp;
 
         case MEDIC:
             character->probabilities = malloc(sizeof(float) * 1);
@@ -36,7 +36,7 @@ Character* create_character(Class type) {
             character->abilities[2] = DESCARGA_VITAL;
 
             character->max_hp = 3000;
-            character->current_hp = 3000;
+            character->current_hp = character->max_hp;
 
         case HACKER:
             character->probabilities = malloc(sizeof(float) * 1);
@@ -47,7 +47,7 @@ Character* create_character(Class type) {
             character->abilities[2] = FUERZA_BRUTA;
 
             character->max_hp = 2500;
-            character->current_hp = 2500;
+            character->current_hp = character->max_hp;
 
         case GREAT_JAGRUZ:
             character->probabilities = malloc(sizeof(float) * 2);
@@ -59,7 +59,7 @@ Character* create_character(Class type) {
             character->abilities[1] = COLETAZO;
 
             character->max_hp = 10000;
-            character->current_hp = 10000;
+            character->current_hp = character->max_hp;
 
         case RUZALOS:
             character->probabilities = malloc(sizeof(float) * 2);
@@ -71,7 +71,7 @@ Character* create_character(Class type) {
             character->abilities[1] = ESPINA_VENENOSA;
 
             character->max_hp = 20000;
-            character->current_hp = 20000;
+            character->current_hp = character->max_hp;
 
         case RUIZ:
             character->probabilities = malloc(sizeof(float) * 3);
@@ -84,7 +84,7 @@ Character* create_character(Class type) {
             character->abilities[1] = REPROBATRON_9000;
             character->abilities[2] = SUDO_RM_RF;
             character->max_hp = 25000;
-            character->current_hp = 25000;
+            character->current_hp = character->max_hp;
     }
     return character;
 }
