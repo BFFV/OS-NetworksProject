@@ -1,6 +1,33 @@
 #include "game.h"
 
 
+// ----------- Game ----------- //
+
+// Initialize game object
+Game* init_game(int max_players) {
+    Game* game = malloc(sizeof(Game));
+    game->max_players = max_players;
+    game->num_players = 0;
+    game->players = malloc(max_players * sizeof(int));
+    game->characters = malloc(max_players * sizeof(Character*));
+    game->rounds = 0;
+    game->playing = false;
+    return game;
+}
+
+// Destroy game
+void destroy_game(Game* game) {
+    free(game->players);
+    for (int p = 0; p < game->num_players; p++) {
+        destroy_character(game->characters[p]);
+    }
+    free(game->characters);
+    free(game);
+}
+
+
+// ----------- Networking ----------- //
+
 // Map pkg_id to request type
 Request get_request_type(int pkg_id) {
     switch (pkg_id) {
@@ -23,25 +50,46 @@ Request get_request_type(int pkg_id) {
     }
 }
 
+// Map request type to pkg_id
+int get_pkg_id(Request request_type) {
+    switch (request_type) {
+        case DISCONNECT:
+            return 0;
+        case CREATE_PLAYER:
+            return 1;
+        case INIT_GAME:
+            return 2;
+        case SELECT_MONSTER:
+            return 3;
+        case SELECT_SKILL:
+            return 4;
+        case SURRENDER:
+            return 5;
+        case CONTINUE:
+            return 6;
+        default:
+            return 6;
+    }
+}
+
 // Listen to multiple clients for requests
-void await_requests(int server_socket, PlayersInfo* players) {
+void await_requests(int server_socket, Game* game) {
 
     // Define vars
     int new_player;  // Player ID
     int activity;  // Used for select()
     int sd;  // Socket ID
     int max_sd;  // Maximum socket descriptor
-    char buffer[1025];  // Data buffer of 1K
 
     // Set of socket descriptors
     fd_set readfds;
 
     // Initialize all client sockets to 0
-    for (int p = 0; p < players->max_players; p++) {
-        players->sockets[p] = 0;
+    for (int p = 0; p < game->max_players; p++) {
+        game->players[p] = 0;
     }
 
-    // Accept incoming connections
+    // Accept incoming requests/connections
     struct sockaddr_in client_addr;
     socklen_t addr_size = sizeof(client_addr);
     while (true) {
@@ -54,10 +102,10 @@ void await_requests(int server_socket, PlayersInfo* players) {
         max_sd = server_socket;
 
         // Add child sockets to set
-        for (int d = 0 ; d < players->max_players; d++) {
+        for (int d = 0 ; d < game->max_players; d++) {
 
             // Socket descriptor
-            sd = players->sockets[d];
+            sd = game->players[d];
 
             // If valid socket descriptor then add to read list
             if (sd > 0) {
@@ -74,19 +122,15 @@ void await_requests(int server_socket, PlayersInfo* players) {
         activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
 
         // New client connection
-        if (FD_ISSET(server_socket, &readfds) && (players->num_players < players->max_players)) {
+        if (FD_ISSET(server_socket, &readfds) && (game->num_players < game->max_players)) {
 
             // Accept new player
             new_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
-            players->sockets[players->num_players] = new_player;
-            players->num_players++;
+            game->players[game->num_players] = new_player;
+            game->num_players++;
 
-            // Inform user of socket number - used in send and receive commands
-            printf("New connection , socket fd is %d , ip is : %s , port : %d\n",
-                   new_player, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
-            // Send new connection greeting message
-            char* num = itoa(players->num_players);
+            // Send new connection welcome message
+            char* num = itoa(game->num_players);
             char* welcome = "Bienvenido Jugador ";
             char* end = "!";
             char* msg[3];
@@ -94,34 +138,34 @@ void await_requests(int server_socket, PlayersInfo* players) {
             msg[1] = num;
             msg[2] = end;
             char* welcome_msg = concatenate(msg, 3);
-            server_send_message(new_player, 1, welcome_msg);
+            server_send_message(new_player, get_pkg_id(MESSAGE), welcome_msg);
             free(num);
             free(welcome_msg);
         }
 
         // Request from client
-        for (int p = 0; p < players->max_players; p++) {
+        for (int p = 0; p < game->max_players; p++) {
 
             // Current client
-            sd = players->sockets[p];
+            sd = game->players[p];
             if (FD_ISSET(sd, &readfds)) {
 
                 // Package ID
                 int pkg_id = server_receive_id(sd);
 
                 // Process request
-                process_request(get_request_type(pkg_id), sd, p, players);
+                process_request(get_request_type(pkg_id), sd, p, game);
             }
         }
     }
 }
 
 // Process request from client
-void process_request(Request req_type, int client, int player, PlayersInfo* players) {
+void process_request(Request req_type, int client, int player, Game* game) {
     char msg[2000];
     switch (req_type) {
         case DISCONNECT:
-            disconnect(client, player, players);
+            disconnect(client, player, game);
             break;
         case CREATE_PLAYER:
             strcpy(msg, server_receive_payload(client));
@@ -147,18 +191,12 @@ void process_request(Request req_type, int client, int player, PlayersInfo* play
     }
 }
 
-// Disconnect player
-void disconnect(int client, int player, PlayersInfo* players) {
-    close(client);
-    players->sockets[player] = 0;
-    players->num_players--;
-}
 
-// Destroy players
-void destroy_players(PlayersInfo* players_info) {
-    free(players_info->sockets);
-    for (int p = 0; p < players_info->max_players; p++) {
-        destroy_character(players_info->characters[p]);
-    }
-    free(players_info->characters);
+// ----------- Handlers ----------- //
+
+// Disconnect player
+void disconnect(int client, int player, Game* game) {
+    close(client);
+    game->players[player] = 0;
+    game->num_players--;
 }
