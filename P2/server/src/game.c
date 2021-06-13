@@ -9,7 +9,9 @@ Game* init_game(int max_players) {
     game->max_players = max_players;
     game->num_players = 0;
     game->players = malloc(max_players * sizeof(int));
+    game->usernames = malloc(max_players * sizeof(char*));
     game->characters = malloc(max_players * sizeof(Character*));
+    game->current_player = 0;
     game->rounds = 0;
     game->playing = false;
     return game;
@@ -34,19 +36,23 @@ Request get_request_type(int pkg_id) {
         case 0:
             return DISCONNECT;
         case 1:
-            return CREATE_PLAYER;
+            return SET_USERNAME;
         case 2:
-            return INIT_GAME;
+            return SELECT_CLASS;
         case 3:
-            return SELECT_MONSTER;
+            return START_GAME;
         case 4:
-            return SELECT_SKILL;
+            return SELECT_MONSTER;
         case 5:
-            return SURRENDER;
+            return SELECT_SKILL;
         case 6:
+            return SELECT_OBJECTIVE;
+        case 7:
+            return SURRENDER;
+        case 8:
             return CONTINUE;
-        default:
-            return CONTINUE;
+        case 9:
+            return MESSAGE;
     }
 }
 
@@ -55,20 +61,24 @@ int get_pkg_id(Request request_type) {
     switch (request_type) {
         case DISCONNECT:
             return 0;
-        case CREATE_PLAYER:
+        case SET_USERNAME:
             return 1;
-        case INIT_GAME:
+        case SELECT_CLASS:
             return 2;
-        case SELECT_MONSTER:
+        case START_GAME:
             return 3;
-        case SELECT_SKILL:
+        case SELECT_MONSTER:
             return 4;
-        case SURRENDER:
+        case SELECT_SKILL:
             return 5;
+        case SELECT_OBJECTIVE:
+            return 6;
+        case SURRENDER:
+            return 7;
         case CONTINUE:
-            return 6;
-        default:
-            return 6;
+            return 8;
+        case MESSAGE:
+            return 9;
     }
 }
 
@@ -141,6 +151,8 @@ void await_requests(int server_socket, Game* game) {
             server_send_message(new_player, get_pkg_id(MESSAGE), welcome_msg);
             free(num);
             free(welcome_msg);
+            char* username = "Ingresa tu nombre de usuario:";
+            server_send_message(new_player, get_pkg_id(SET_USERNAME), username);
         }
 
         // Request from client
@@ -150,11 +162,19 @@ void await_requests(int server_socket, Game* game) {
             sd = game->players[p];
             if (FD_ISSET(sd, &readfds)) {
 
-                // Package ID
-                int pkg_id = server_receive_id(sd);
+                if (game->playing && game->current_player == p) {
+                    // Package ID
+                    int pkg_id = server_receive_id(sd);
 
-                // Process request
-                process_request(get_request_type(pkg_id), sd, p, game);
+                    // Process request
+                    process_request(get_request_type(pkg_id), sd, p, game);
+                } else if (!game->playing) {
+                    // Package ID
+                    int pkg_id = server_receive_id(sd);
+
+                    // Process request
+                    process_request(get_request_type(pkg_id), sd, p, game);
+                }
             }
         }
     }
@@ -162,30 +182,44 @@ void await_requests(int server_socket, Game* game) {
 
 // Process request from client
 void process_request(Request req_type, int client, int player, Game* game) {
-    char msg[2000];
     switch (req_type) {
+
         case DISCONNECT:
             disconnect(client, player, game);
             break;
-        case CREATE_PLAYER:
-            strcpy(msg, server_receive_payload(client));
-            printf("%s\n", msg);
+
+        case SET_USERNAME:
+            set_username(client, player, game);
             break;
-        case INIT_GAME:
-            // disconnect(client, player, players);
+
+        case SELECT_CLASS:
+            select_class(client, player, game);
             break;
+
+        case START_GAME:
+            start_game(client, player, game);
+            break;
+
         case SELECT_MONSTER:
-            // disconnect(client, player, players);
+            select_monster(client, player, game);
             break;
+
         case SELECT_SKILL:
-            // disconnect(client, player, players);
+            select_skill(client, player, game);
             break;
+
+        case SELECT_OBJECTIVE:
+            select_objective(client, player, game);
+            break;
+
         case SURRENDER:
             // disconnect(client, player, players);
             break;
+
         case CONTINUE:
             // disconnect(client, player, players);
             break;
+
         default:
             break;
     }
@@ -199,4 +233,158 @@ void disconnect(int client, int player, Game* game) {
     close(client);
     game->players[player] = 0;
     game->num_players--;
+}
+
+// Set Username for given player
+void set_username(int client, int player, Game* game) {
+    char* username = server_receive_payload(client);
+    game->usernames[player] = calloc(sizeof(char), strlen(username) + 1);
+    strcpy(game->usernames[player], username);
+    free(username);
+
+    // Send message for class selection
+    char* class = "Ingresa tu clase:\n\n1) Cazador\n2) Médico\n3) Hacker\n";
+    server_send_message(client, get_pkg_id(SELECT_CLASS), class);
+}
+
+// Set Username for given player
+void select_class(int client, int player, Game* game) {
+    int class_id = atoi(server_receive_payload(client)) - 1;
+    Character* new_character;
+    char* selected;
+    switch (class_id) {
+        case 0:
+            selected = "Cazador";
+            new_character = create_character(HUNTER);
+            break;
+
+        case 1:
+            selected = "Médico";
+            new_character = create_character(MEDIC);
+            break;
+
+        case 2:
+            selected = "Hacker";
+            new_character = create_character(HACKER);
+            break;
+    }
+    game->characters[player] = new_character;
+    char* first = "El jugador ";
+    char* second = " está listo para jugar como ";
+    char* msg_notify[5];
+    msg_notify[0] = first;
+    msg_notify[1] = game->usernames[player];
+    msg_notify[2] = second;
+    msg_notify[3] = selected;
+    msg_notify[4] = "!";
+    char* notify = concatenate(msg_notify, 5);
+    server_send_message(client, get_pkg_id(MESSAGE), notify);
+    if (player) {
+        server_send_message(game->players[0], get_pkg_id(MESSAGE), notify);
+    } else {
+        char* start_msg = "Presiona ENTER para comenzar el juego";
+        server_send_message(game->players[0], get_pkg_id(START_GAME), start_msg);
+    }
+    free(notify);
+}
+
+// Initialize Game (Leader Only)
+void start_game(int client, int player, Game* game) {
+    if (player != 0) {
+        return;
+    }
+    game->playing = true;
+    char* select_monster_msg = "Selecciona un monstruo contra el que pelear:\n\n1)Great JagRuz\n2)Ruzalos\n3)Ruiz, el Gemelo Malvado del Profesor Ruz\n";
+    server_send_message(client, get_pkg_id(SELECT_MONSTER), select_monster_msg);
+}
+
+void select_monster(int client, int player, Game* game) {
+    if (player != 0) {
+        return;
+    }
+
+    int monster_id = atoi(server_receive_payload(client)) - 1;
+    Character* monster;
+    char* monster_name;
+    switch (monster_id) {
+        case 0:
+            monster_name = "Great JagRuz";
+            monster = create_character(GREAT_JAGRUZ);
+            break;
+
+        case 1:
+            monster_name = "Ruzalos";
+            monster = create_character(RUZALOS);
+            break;
+
+        case 2:
+            monster_name = "Ruiz";
+            monster = create_character(RUIZ);
+            break;
+    }
+
+    // Notifies all game users that the game has started
+    char* raw_msg[3];
+    char* raw_text_0 = ">> El juego ha iniciado! Pelearán contra el temible mounstro: ";
+    raw_msg[0] = raw_text_0;
+    raw_msg[1] = monster_name;
+    char* raw_text_1 = "...\n";
+    raw_msg[2] = raw_text_1;
+    char* start_msg = concatenate(raw_msg, 3);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), start_msg, -1);
+    free(start_msg);
+
+    // Start the first round
+    start_turn(game, 0);
+}
+
+
+// Select skill
+void select_skill(int client, int player, Game* game) {
+    int skill_id = atoi(server_receive_payload(client)) - 1;
+    Ability selected = get_ability(game->characters[player], skill_id);
+    char* msg = "Selecciona objetivo:\n";
+    server_send_message(client, get_pkg_id(MESSAGE), msg);
+    char* player_list[game->num_players];
+    for (int p = 0; p < game->num_players; p++) {
+        char* index = itoa(p + 1);
+        char* parent = ") ";
+        char* username = game->usernames[player];
+        char* newline = "\n";
+        char* item[4];
+        item[0] = index;
+        item[1] = parent;
+        item[2] = username;
+        item[3] = newline;
+        char* player_item = concatenate(item, 4);
+        strcpy(player_list[p], player_item);
+        free(index);
+        free(player_item);
+    }
+    char* obj_msg = concatenate(player_list, game->num_players);
+    server_send_message(client, get_pkg_id(SELECT_OBJECTIVE), obj_msg);
+    free(obj_msg);
+}
+
+// Select objective
+void select_objective(int client, int player, Game* game) {
+    int objective_id = atoi(server_receive_payload(client)) - 1;
+    return;
+}
+
+// ----------- Game Functions ----------- //
+
+// Start the turn of the given player
+void start_turn(Game* game, int player) {
+
+    // Notify all users except the current players
+    char* raw_msg[3];
+    char* raw_text_0 = "El jugador";
+    raw_msg[0] = raw_text_0;
+    raw_msg[1] = game->usernames[player];
+    char* raw_text_1 = "está jugando...\n";
+    raw_msg[2] = raw_text_1;
+    char* notification_msg = concatenate(raw_msg, 3);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
+    free(notification_msg);
 }

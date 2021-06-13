@@ -11,27 +11,31 @@
 typedef struct game {
     int max_players;  // Maximum amount of players
     int num_players;  // Amount of players
+
     int* players;  // Array of player sockets
+    char** usernames; // Player usernames
     Character** characters;  // Player characters
+    int current_player;  // Current player
+
+    Character* monster; // Game monster
+
     int rounds;  // Round counter
     bool playing;  // Lobby/Game
 } Game;
 
 // Request types
 typedef enum request_types {
-
-    // Server side actions
     DISCONNECT,
-    CREATE_PLAYER,
-    INIT_GAME,
+    SET_USERNAME,
+    SELECT_CLASS,
+    START_GAME,
     SELECT_MONSTER,
-    SELECT_SKILL,
-    SURRENDER,
+    SELECT_SKILL,  // SERVER only
+    SELECT_OBJECTIVE,
+    SURRENDER,  // SERVER only
     CONTINUE,
-
-    // Client side actions
-    MESSAGE
-
+    MESSAGE,  // CLIENT only
+    TURN,  // CLIENT only: Includes skill selection, surrender, disconnect
 } Request;
 
 
@@ -59,7 +63,30 @@ int get_pkg_id(Request request_type);
 void process_request(Request req_type, int client, int player, Game* game);
 
 
+// ----------- Game Functions ----------- //
+
+void start_turn(Game* game, int player);
+
+
 // ----------- Handlers ----------- //
 
 // Disconnect player
 void disconnect(int client, int player, Game* game);
+
+// Set Username for given player
+void set_username(int client, int player, Game* game);
+
+// Select Class
+void select_class(int client, int player, Game* game);
+
+// Start Game
+void start_game(int client, int player, Game* game);
+
+// Select monster
+void select_monster(int client, int player, Game* game);
+
+// Select skill
+void select_skill(int client, int player, Game* game);
+
+// Select objective
+void select_objective(int client, int player, Game* game);

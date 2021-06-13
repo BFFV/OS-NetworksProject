@@ -36,6 +36,15 @@ typedef enum ability {
     SUDO_RM_RF
 } Ability;
 
+// Define buff struct for sequential buffing or debuffing
+struct buff;
+typedef struct buff Buff;
+struct buff {
+    int rounds;
+    double multiplier;
+    Buff* next_buff;
+};
+
 // Model characters & monsters
 struct character;
 typedef struct character Character;
@@ -52,14 +61,13 @@ struct character {
     Ability* abilities;
     double* probabilities;
 
-    // Hacker duplicates attack
-    double attack_mult;
-
-    // Debuffs
+    // Damage counters
     int intoxicated_counter;
     int bleeding_counter;
-    // int x2_attack_counter[128];
-    // int n_buffs;
+
+    // Buff and Debuff
+    Buff* buffs;
+    int n_buffs;
     bool failed;
 
     // Special Class: Hacker (deals 10k of damage after counter = 3)
@@ -80,9 +88,15 @@ void recover_hp(Character* character, int hp);
 
 // Character interactions
 Ability get_random_ability(Character* character);
-Ability get_ability(Character* character, int ability_n);
+Ability get_ability(Character* character, int ability_id);
 void use_ability(Character* attacker, Character* defender, Ability ability, int n_characters, Character** characters, int round);
+double get_character_multiplier(Character* character);
 void apply_status_effects(Character* character);
 
 // Destroy methods
 void destroy_character(Character* character);
+
+
+// Aux methods
+void add_buff(Character* character);
+void copy_ability(Character* attacker, int n_characters, Character** characters, int round);

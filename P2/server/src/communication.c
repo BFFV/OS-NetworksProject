@@ -30,3 +30,13 @@ void server_send_message(int client_socket, int pkg_id, char* message) {
     // Send package
     send(client_socket, msg, 2 + payloadSize, 0);
 }
+
+// Send message to all connected users
+void notify_users(int* clients, int n_clients, int pkg_id, char* message, int exception) {
+    for (int u = 0; u < n_clients; u++) {
+        if (u == exception) {
+            continue;
+        }
+        server_send_message(clients[u], pkg_id, message);
+    }
+}
