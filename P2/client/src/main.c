@@ -7,13 +7,12 @@
 
 // Receive input
 char* get_input() {
-    char* response = malloc(20);
+    char* response = calloc(sizeof(char), 255);
     int pos = 0;
+    printf(">> ");
     while (true) {
         char c = getchar();
-
         if (c == '\n') break;
-
         response[pos] = c;
         pos++;
     }
@@ -31,7 +30,7 @@ int main (int argc, char *argv[]) {
     while (true) {
         int msg_code = client_receive_id(client);
         char* message = client_receive_payload(client);
-        printf("%s\n", message);
+        printf("%s", message);
         free(message);
 
         // Input required

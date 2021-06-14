@@ -11,10 +11,41 @@ Game* init_game(int max_players) {
     game->players = malloc(max_players * sizeof(int));
     game->usernames = malloc(max_players * sizeof(char*));
     game->characters = malloc(max_players * sizeof(Character*));
+    for (int p = 0; p < game->max_players; p++) {
+        game->characters[p] = NULL;
+    }
+    game->monster = malloc(sizeof(Character*));
     game->current_player = 0;
     game->rounds = 0;
     game->playing = false;
     return game;
+}
+
+// Check game state
+void check_state(Game* game) {
+    // Check for dead monster
+    if (game->monster->current_hp <= 0) {
+        char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
+        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), end_message, -1);
+        return;
+        // TODO: Re- partir el juego, chequear por nuevo lider y preguntar qué hacer...
+
+    } else {
+
+        // Next player's turn
+        if (game->current_player < (game->num_players - 1)) {
+            game->current_player++;
+
+        // The round has ended, it's time for the monster to attack
+        } else {
+            monster_turn(game);
+            apply_status_effects(game->characters, game->num_players);
+            // TODO: death
+            game->current_player = 0;
+            game->rounds++;
+        }
+        start_turn(game->players[game->current_player], game->current_player, game);
+    }
 }
 
 // Destroy game
@@ -22,7 +53,10 @@ void destroy_game(Game* game) {
     free(game->players);
     for (int p = 0; p < game->num_players; p++) {
         destroy_character(game->characters[p]);
+        free(game->usernames[p]);
     }
+    destroy_character(game->monster);
+    free(game->usernames);
     free(game->characters);
     free(game);
 }
@@ -132,27 +166,47 @@ void await_requests(int server_socket, Game* game) {
         activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
 
         // New client connection
-        if (FD_ISSET(server_socket, &readfds) && (game->num_players < game->max_players)) {
+        if (FD_ISSET(server_socket, &readfds)) {
 
-            // Accept new player
-            new_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
-            game->players[game->num_players] = new_player;
-            game->num_players++;
+            // Invalid new player
+            if ((game->num_players == game->max_players) || (game->playing)) {
+                int invalid_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
+                char* invalid_msg = "\nNo es posible conectarse al juego actualmente!\n";
+                server_send_message(invalid_player, get_pkg_id(MESSAGE), invalid_msg);
+                close(invalid_player);
+            } else {  // Accept new player
+                new_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
+                game->players[game->num_players] = new_player;
+                game->num_players++;
 
-            // Send new connection welcome message
-            char* num = itoa(game->num_players);
-            char* welcome = "Bienvenido Jugador ";
-            char* end = "!";
-            char* msg[3];
-            msg[0] = welcome;
-            msg[1] = num;
-            msg[2] = end;
-            char* welcome_msg = concatenate(msg, 3);
-            server_send_message(new_player, get_pkg_id(MESSAGE), welcome_msg);
-            free(num);
-            free(welcome_msg);
-            char* username = "Ingresa tu nombre de usuario:";
-            server_send_message(new_player, get_pkg_id(SET_USERNAME), username);
+                // Send new connection welcome message
+                char* num = itoa(game->num_players);
+                char* welcome = "\nBienvenido Jugador ";
+                char* end = "!\n";
+                char* msg[3];
+                msg[0] = welcome;
+                msg[1] = num;
+                msg[2] = end;
+                char* welcome_msg = concatenate(msg, 3);
+                server_send_message(new_player, get_pkg_id(MESSAGE), welcome_msg);
+                free(welcome_msg);
+                if (game->num_players == 1) {
+                    char* leader = "\nAhora eres el líder del equipo!\n";
+                    server_send_message(new_player, get_pkg_id(MESSAGE), leader);
+                } else {
+                    char* added = "\nSe ha unido el Jugador ";
+                    char* new_msg[3];
+                    new_msg[0] = added;
+                    new_msg[1] = num;
+                    new_msg[2] = end;
+                    char* notify_leader = concatenate(new_msg, 3);
+                    server_send_message(game->players[0], get_pkg_id(MESSAGE), notify_leader);
+                    free(notify_leader);
+                }
+                free(num);
+                char* username = "\nIngresa tu nombre de usuario:\n\n";
+                server_send_message(new_player, get_pkg_id(SET_USERNAME), username);
+            }
         }
 
         // Request from client
@@ -161,14 +215,7 @@ void await_requests(int server_socket, Game* game) {
             // Current client
             sd = game->players[p];
             if (FD_ISSET(sd, &readfds)) {
-
-                if (game->playing && game->current_player == p) {
-                    // Package ID
-                    int pkg_id = server_receive_id(sd);
-
-                    // Process request
-                    process_request(get_request_type(pkg_id), sd, p, game);
-                } else if (!game->playing) {
+                if ((game->playing && game->current_player == p) || (!game->playing)) {
                     // Package ID
                     int pkg_id = server_receive_id(sd);
 
@@ -235,7 +282,7 @@ void disconnect(int client, int player, Game* game) {
     game->num_players--;
 }
 
-// Set Username for given player
+// Set username
 void set_username(int client, int player, Game* game) {
     char* username = server_receive_payload(client);
     game->usernames[player] = calloc(sizeof(char), strlen(username) + 1);
@@ -243,11 +290,11 @@ void set_username(int client, int player, Game* game) {
     free(username);
 
     // Send message for class selection
-    char* class = "Ingresa tu clase:\n\n1) Cazador\n2) Médico\n3) Hacker\n";
+    char* class = "\nIngresa tu clase:\n\n1) Cazador\n2) Médico\n3) Hacker\n\n";
     server_send_message(client, get_pkg_id(SELECT_CLASS), class);
 }
 
-// Set Username for given player
+// Select class
 void select_class(int client, int player, Game* game) {
     int class_id = atoi(server_receive_payload(client)) - 1;
     Character* new_character;
@@ -269,40 +316,54 @@ void select_class(int client, int player, Game* game) {
             break;
     }
     game->characters[player] = new_character;
-    char* first = "El jugador ";
-    char* second = " está listo para jugar como ";
-    char* msg_notify[5];
-    msg_notify[0] = first;
-    msg_notify[1] = game->usernames[player];
-    msg_notify[2] = second;
-    msg_notify[3] = selected;
-    msg_notify[4] = "!";
-    char* notify = concatenate(msg_notify, 5);
+    char* ready = " está listo para jugar como ";
+    char* msg_notify[4];
+    msg_notify[0] = game->usernames[player];
+    msg_notify[1] = ready;
+    msg_notify[2] = selected;
+    msg_notify[3] = "!\n";
+    char* notify = concatenate(msg_notify, 4);
     server_send_message(client, get_pkg_id(MESSAGE), notify);
     if (player) {
         server_send_message(game->players[0], get_pkg_id(MESSAGE), notify);
     } else {
-        char* start_msg = "Presiona ENTER para comenzar el juego";
+        char* start_msg = "\nPresiona ENTER para intentar comenzar el juego:\n";
         server_send_message(game->players[0], get_pkg_id(START_GAME), start_msg);
     }
     free(notify);
 }
 
-// Initialize Game (Leader Only)
+// Initialize game (Leader Only)
 void start_game(int client, int player, Game* game) {
-    if (player != 0) {
-        return;
+    // Ignore payload
+    char* ignore = server_receive_payload(client);
+    if (ignore != NULL) {
+        free(ignore);
     }
+
+    // Check if all players are ready
+    for (int p = 0; p < game->num_players; p++) {
+        if (game->characters[p] == NULL) {
+            char* not_ready_msg = "\nAlgunos jugadores aún no están listos!\n";
+            server_send_message(client, get_pkg_id(MESSAGE), not_ready_msg);
+            char* start_msg = "\nPresiona ENTER para intentar comenzar el juego:\n";
+            server_send_message(client, get_pkg_id(START_GAME), start_msg);
+            return;
+        }
+    }
+
+    // All players ready
+    printf("READY\n");
     game->playing = true;
-    char* select_monster_msg = "Selecciona un monstruo contra el que pelear:\n\n1)Great JagRuz\n2)Ruzalos\n3)Ruiz, el Gemelo Malvado del Profesor Ruz\n";
+    game->current_player = 0;
+    char* select_monster_msg = "\nSelecciona un monstruo contra el que combatir:\n\n1) Great JagRuz\n2) Ruzalos\n3) Ruiz, el Gemelo Malvado del Profesor Ruz\n4) Monstruo Aleatorio\n";
     server_send_message(client, get_pkg_id(SELECT_MONSTER), select_monster_msg);
 }
 
+// Select the monster to play against
 void select_monster(int client, int player, Game* game) {
-    if (player != 0) {
-        return;
-    }
 
+    // Chosen monster
     int monster_id = atoi(server_receive_payload(client)) - 1;
     Character* monster;
     char* monster_name;
@@ -321,70 +382,250 @@ void select_monster(int client, int player, Game* game) {
             monster_name = "Ruiz";
             monster = create_character(RUIZ);
             break;
+
+        case 3:  // Random
+            monster = create_character(get_random_monster());
+            break;
     }
 
-    // Notifies all game users that the game has started
+    // Notify all game users that the game has started
+    char* raw_text_0 = "\nEl juego ha comenzado! Pelearán contra el temible monstruo: ";
+    char* raw_text_1 = "...\n";
     char* raw_msg[3];
-    char* raw_text_0 = ">> El juego ha iniciado! Pelearán contra el temible mounstro: ";
     raw_msg[0] = raw_text_0;
     raw_msg[1] = monster_name;
-    char* raw_text_1 = "...\n";
     raw_msg[2] = raw_text_1;
     char* start_msg = concatenate(raw_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), start_msg, -1);
     free(start_msg);
 
     // Start the first round
-    start_turn(game, 0);
+    start_turn(client, player, game);
 }
 
+// Start turn
+void start_turn(int client, int player, Game* game) {
+
+    // Information for leader
+    if (!player) {
+        char* game_stats_raw[3 + game->num_players];
+        char* game_stats_raw_text;
+
+        // Build notification message
+        game_stats_raw_text = "$$$$$$$$$$$ STATS $$$$$$$$$$$$\n";
+        game_stats_raw[0] = game_stats_raw_text;
+
+        // Get each player stats
+        for (int p = 0; p < game->num_players; p++) {
+            char* player_raw_line[7];
+            char* raw_line_text;
+
+            // Build character stats line
+            player_raw_line[0] = game->usernames[p];
+            raw_line_text = "[";
+            player_raw_line[1] = raw_line_text;
+            player_raw_line[2] = game->characters[p]->class_name;
+            raw_line_text = "] -> VIDA: ";
+            player_raw_line[3] = raw_line_text;
+            char* current_hp = itoa(game->characters[p]->current_hp);
+            strcpy(player_raw_line[4], current_hp);
+            player_raw_line[5] = " / ";
+            char* max_hp = itoa(game->characters[p]->max_hp);
+            strcpy(player_raw_line[6], max_hp);
+            player_raw_line[7] = "\n";
+            free(current_hp);
+            free(max_hp);
+
+            // Add line to notification message
+            char* player_stats = concatenate(player_raw_line, 7);
+            strcpy(game_stats_raw[p + 1], player_stats);
+            free(player_stats);
+        }
+
+        char* monster_stats_raw[6];
+        char* monster_raw_text;
+
+        // Monster stats
+        monster_stats_raw[0] = game->monster->class_name;
+        monster_raw_text = " -> VIDA: ";
+        monster_stats_raw[1] = monster_raw_text;
+        char* monster_current_hp = itoa(game->monster->current_hp);
+        strcpy(monster_stats_raw[2], monster_current_hp);
+        monster_raw_text = " / ";
+        monster_stats_raw[3] = monster_raw_text;
+        char* monster_max_hp = itoa(game->monster->max_hp);
+        strcpy(monster_stats_raw[4], monster_max_hp);
+        monster_raw_text = "\n";
+        monster_stats_raw[5] = monster_raw_text;
+        free(monster_current_hp);
+        free(monster_max_hp);
+
+        // Concatenate monster stats and add to notification
+        char* monster_stats = concatenate(monster_stats_raw, 6);
+        strcpy(game_stats_raw[game->num_players + 1], monster_stats);
+        free(monster_stats);
+
+        // Concatenate notification and notify all users
+        game_stats_raw_text = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n";
+        game_stats_raw[game->num_players + 3] = game_stats_raw_text; 
+        char* notification = concatenate(game_stats_raw, game->num_players + 3);
+        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
+        free(notification);
+    }
+
+    // Ask for skill
+    send_select_skill_message(game, player);
+}
 
 // Select skill
 void select_skill(int client, int player, Game* game) {
     int skill_id = atoi(server_receive_payload(client)) - 1;
     Ability selected = get_ability(game->characters[player], skill_id);
-    char* msg = "Selecciona objetivo:\n";
-    server_send_message(client, get_pkg_id(MESSAGE), msg);
-    char* player_list[game->num_players];
-    for (int p = 0; p < game->num_players; p++) {
-        char* index = itoa(p + 1);
-        char* parent = ") ";
-        char* username = game->usernames[player];
-        char* newline = "\n";
-        char* item[4];
-        item[0] = index;
-        item[1] = parent;
-        item[2] = username;
-        item[3] = newline;
-        char* player_item = concatenate(item, 4);
-        strcpy(player_list[p], player_item);
-        free(index);
-        free(player_item);
+    game->characters[player]->selected_skill_id = skill_id;
+    if (game->characters[player]->enemy_target[skill_id]) {
+        use_ability(game->characters[player], game->monster, selected, game->num_players, game->characters, game->rounds);
+        // TODO: Notify action
+        check_state(game);
+        return;
     }
-    char* obj_msg = concatenate(player_list, game->num_players);
-    server_send_message(client, get_pkg_id(SELECT_OBJECTIVE), obj_msg);
-    free(obj_msg);
+    select_objective(client, player, game);
 }
 
 // Select objective
 void select_objective(int client, int player, Game* game) {
+    Character* player_character = game->characters[player];
     int objective_id = atoi(server_receive_payload(client)) - 1;
-    return;
+
+    // Notifies other users about the action
+    char* raw_notification[7];
+    char* raw_notification_header = "\n";
+    raw_notification[0] = raw_notification_header;
+    raw_notification[1] = game->usernames[player];
+    char* raw_not_text_1 = " usó la habilidad -";
+    raw_notification[2] = raw_not_text_1;
+    raw_notification[3] = player_character->ability_names[player_character->selected_skill_id];
+    char* raw_not_text_2 = "- en su aliado ";
+    raw_notification[4] = raw_not_text_2;
+    raw_notification[5] = game->usernames[objective_id];
+    char* newline = "\n";
+    raw_notification[6] = newline;
+
+    // Send notification to all players
+    char* notification_msg = concatenate(raw_notification, 7);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
+    free(notification_msg);
+
+    // TODO: retornar un mensaje con lo que hizo la habilidad
+    use_ability(player_character,
+                game->characters[objective_id],
+                player_character->abilities[player_character->selected_skill_id],
+                game->num_players, game->characters, game->rounds);
+    check_state(game);
 }
 
-// ----------- Game Functions ----------- //
+// ----------- Helper Functions ----------- //
 
-// Start the turn of the given player
-void start_turn(Game* game, int player) {
+// Send skill selection message
+void send_select_skill_message(Game* game, int player) {
 
-    // Notify all users except the current players
+    // Notify all users except the current player
     char* raw_msg[3];
-    char* raw_text_0 = "El jugador";
+    char* raw_text_0 = "\n";
     raw_msg[0] = raw_text_0;
     raw_msg[1] = game->usernames[player];
-    char* raw_text_1 = "está jugando...\n";
+    char* raw_text_1 = " está realizando su turno...\n";
     raw_msg[2] = raw_text_1;
     char* notification_msg = concatenate(raw_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
+    free(notification_msg);
+
+    // Send select skill to current player
+    char* raw_select_msg[1 + game->characters[player]->n_abilities];
+    char* raw_select_header = "\nElige una de las siguientes habilidades:\n";
+    raw_select_msg[0] = raw_select_header;
+    for (int a = 0; a < game->characters[player]->n_abilities; a++) {
+        char* raw_skill_line[4];
+        char* index = itoa(a + 1);
+        strcpy(raw_skill_line[0], index);
+        char* raw_text_ability = ") ";
+        raw_skill_line[1] = raw_text_ability;
+        raw_skill_line[2] = game->characters[player]->ability_names[a];
+        char* newline = "\n";
+        raw_skill_line[3] = newline;
+        char* skill_msg = concatenate(raw_skill_line, 4);
+        strcpy(raw_select_msg[1 + a], skill_msg);
+        free(skill_msg);
+        free(index);
+    }
+
+    // Send selection message to user
+    char* select_message = concatenate(raw_select_msg, 1 + game->characters[player]->n_abilities);
+    server_send_message(game->players[player], get_pkg_id(SELECT_SKILL), select_message);
+    free(select_message);
+}
+
+// Send objective message if needed
+void send_select_objective_message(Game* game, int player) {
+    char* raw_select_msg[1 + game->num_players];
+    char* raw_header = "Selecciona objetivo:\n";
+    raw_select_msg[0] = raw_header;
+
+    for (int p = 0; p < game->num_players; p++) {
+        char* raw_objective_line[4];
+        char* index = itoa(p + 1);
+        strcpy(raw_objective_line[0], index);
+        char* raw_obj_par = ") ";
+        raw_objective_line[1] = raw_obj_par;
+        raw_objective_line[2] = game->usernames[player];
+        char* newline = ".\n";
+        raw_objective_line[3] = newline;
+        char* objective_line = concatenate(raw_objective_line, 4);
+        strcpy(raw_select_msg[p], objective_line);
+        free(objective_line);
+        free(index);
+    }
+    char* select_message = concatenate(raw_select_msg, 1 + game->num_players);
+    server_send_message(game->players[player], get_pkg_id(SELECT_OBJECTIVE), select_message);
+    free(select_message);
+}
+
+// The monster uses an ability on a random user
+void monster_turn(Game* game) {
+
+    // Get random ability
+    int selected_ability_id = get_random_ability_id(game->monster);
+    Ability selected_ability = game->monster->abilities[selected_ability_id];
+    Character* defender = NULL;
+    int defender_player_id;
+
+    // Hunter's ability: Distraer
+    if (game->monster->next_defender) {
+        defender = game->monster->next_defender;
+        // TODO: defender player id as attribute for Character
+        defender_player_id = 0;
+        game->monster->next_defender = NULL;
+
+    } else {
+        // Get a random player
+        defender_player_id = get_random_character_id(game->num_players);
+        defender = game->characters[defender_player_id];
+    }
+
+    // Monster attacks
+    use_ability(game->monster, defender, selected_ability, game->num_players, game->characters, game->rounds);
+
+    // TODO: Esta notificación debería retornarse en el use_ability
+    // Notifies users of the monster attack
+    char* raw_notification[5];
+    char* raw_notification_header = "\nEl monstruo usó la habilidad -";
+    raw_notification[0] = raw_notification_header;
+    raw_notification[1] = game->monster->ability_names[selected_ability_id];
+    char* raw_not_text_2 = "- sobre ";
+    raw_notification[2] = raw_not_text_2;
+    raw_notification[3] = game->usernames[defender_player_id];
+    char* newline = "\n";
+    raw_notification[4] = newline;
+    char* notification_msg = concatenate(raw_notification, 5);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
     free(notification_msg);
 }

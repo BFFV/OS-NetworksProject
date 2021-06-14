@@ -19,7 +19,11 @@ char* client_receive_payload(int client_socket) {
 
 // Send message to server
 void client_send_message(int client_socket, int pkg_id, char* message) {
-    int payloadSize = strlen(message) + 1;
+    int length = strlen(message);
+    if (length) {
+        length++;
+    }
+    int payloadSize = length;
 
     // Build package
     char msg[1 + 1 + payloadSize];

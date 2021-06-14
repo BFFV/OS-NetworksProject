@@ -11,14 +11,11 @@
 typedef struct game {
     int max_players;  // Maximum amount of players
     int num_players;  // Amount of players
-
     int* players;  // Array of player sockets
-    char** usernames; // Player usernames
+    char** usernames;  // Player usernames
     Character** characters;  // Player characters
     int current_player;  // Current player
-
-    Character* monster; // Game monster
-
+    Character* monster;  // Game monster
     int rounds;  // Round counter
     bool playing;  // Lobby/Game
 } Game;
@@ -44,6 +41,9 @@ typedef enum request_types {
 // Initialize game object
 Game* init_game(int max_players);
 
+// Check game state
+void check_state(Game* game);
+
 // Destroy game
 void destroy_game(Game* game);
 
@@ -63,27 +63,33 @@ int get_pkg_id(Request request_type);
 void process_request(Request req_type, int client, int player, Game* game);
 
 
-// ----------- Game Functions ----------- //
+// ----------- Helper Functions ----------- //
 
-void start_turn(Game* game, int player);
+void send_select_skill_message(Game* game, int player);
 
+void send_select_objective_message(Game* game, int player);
+
+void monster_turn(Game* game);
 
 // ----------- Handlers ----------- //
 
 // Disconnect player
 void disconnect(int client, int player, Game* game);
 
-// Set Username for given player
+// Set username
 void set_username(int client, int player, Game* game);
 
-// Select Class
+// Select class
 void select_class(int client, int player, Game* game);
 
-// Start Game
+// Start game
 void start_game(int client, int player, Game* game);
 
 // Select monster
 void select_monster(int client, int player, Game* game);
+
+// Start turn
+void start_turn(int client, int player, Game* game);
 
 // Select skill
 void select_skill(int client, int player, Game* game);

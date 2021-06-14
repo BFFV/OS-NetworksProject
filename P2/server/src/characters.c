@@ -4,6 +4,7 @@
 // Create new character
 Character* create_character(Class type) {
     Character* character = malloc(sizeof(Character));
+    character->type = type;
 
     // Initialize common attributes and counters
     character->is_active = true;
@@ -21,6 +22,7 @@ Character* create_character(Class type) {
     // Define abilities for every class
     switch (type) {
         case HUNTER:
+            character->class_name = "CAZADOR";
             character->probabilities = malloc(sizeof(double) * 1);
 
             character->abilities = malloc(sizeof(Ability) * 3);
@@ -28,12 +30,20 @@ Character* create_character(Class type) {
             character->abilities[1] = CORTE_CRUZADO;
             character->abilities[2] = DISTRAER;
 
+            character->ability_names[0] = "Estocada";
+            character->ability_names[1] = "Corte Cruzado";
+            character->ability_names[2] = "Distraer";
+            character->enemy_target[0] = 1;
+            character->enemy_target[1] = 1;
+            character->enemy_target[2] = 1;
+
             character->is_monster = false;
             character->max_hp = 5000;
             character->current_hp = character->max_hp;
             break;
 
         case MEDIC:
+            character->class_name = "MÉDICO";
             character->probabilities = malloc(sizeof(double) * 1);
 
             character->abilities = malloc(sizeof(Ability) * 3);
@@ -41,12 +51,20 @@ Character* create_character(Class type) {
             character->abilities[1] = DESTELLO_REGENERADOR;
             character->abilities[2] = DESCARGA_VITAL;
 
+            character->ability_names[0] = "Curar";
+            character->ability_names[1] = "Destello Regenerador";
+            character->ability_names[2] = "Descarga Vital";
+            character->enemy_target[0] = 0;
+            character->enemy_target[1] = 1;
+            character->enemy_target[2] = 1;
+
             character->is_monster = false;
             character->max_hp = 3000;
             character->current_hp = character->max_hp;
             break;
 
         case HACKER:
+            character->class_name = "HACKER";
             character->probabilities = malloc(sizeof(double) * 1);
 
             character->abilities = malloc(sizeof(Ability) * 3);
@@ -54,12 +72,20 @@ Character* create_character(Class type) {
             character->abilities[1] = ATAQUE_DDOS;
             character->abilities[2] = FUERZA_BRUTA;
 
+            character->ability_names[0] = "Inyección SQL";
+            character->ability_names[1] = "Ataque DDOS";
+            character->ability_names[2] = "Fuerza Bruta";
+            character->enemy_target[0] = 0;
+            character->enemy_target[1] = 1;
+            character->enemy_target[2] = 1;
+
             character->is_monster = false;
             character->max_hp = 2500;
             character->current_hp = character->max_hp;
             break;
 
         case GREAT_JAGRUZ:
+            character->class_name = "GREAT JAGRUZ";
             character->probabilities = malloc(sizeof(double) * 2);
             character->probabilities[0] = 0.5;
             character->probabilities[1] = 0.5;
@@ -68,12 +94,18 @@ Character* create_character(Class type) {
             character->abilities[0] = RUZALOS;
             character->abilities[1] = COLETAZO;
 
+            character->ability_names[0] = "Ruzalos";
+            character->ability_names[1] = "Coletazo";
+            character->enemy_target[0] = 1;
+            character->enemy_target[1] = 1;
+
             character->is_monster = true;
             character->max_hp = 10000;
             character->current_hp = character->max_hp;
             break;
 
         case RUZALOS:
+            character->class_name = "RUZALOS";
             character->probabilities = malloc(sizeof(double) * 2);
             character->probabilities[0] = 0.4;
             character->probabilities[1] = 0.6;
@@ -82,12 +114,18 @@ Character* create_character(Class type) {
             character->abilities[0] = SALTO;
             character->abilities[1] = ESPINA_VENENOSA;
 
+            character->ability_names[0] = "Salto";
+            character->ability_names[1] = "Espina Venenosa";
+            character->enemy_target[0] = 1;
+            character->enemy_target[1] = 1;
+
             character->is_monster = true;
             character->max_hp = 20000;
             character->current_hp = character->max_hp;
             break;
 
         case RUIZ:
+            character->class_name = "RUIZ";
             character->probabilities = malloc(sizeof(double) * 3);
             character->probabilities[0] = 0.4;
             character->probabilities[1] = 0.2;
@@ -97,6 +135,12 @@ Character* create_character(Class type) {
             character->abilities[0] = CASO_COPIA;
             character->abilities[1] = REPROBATRON_9000;
             character->abilities[2] = SUDO_RM_RF;
+
+            character->ability_names[0] = "Caso Copia";
+            character->ability_names[1] = "Reprobatron 9000";
+            character->ability_names[2] = "sudo -rm -rf";
+            character->enemy_target[0] = 1;
+            character->enemy_target[1] = 1;
 
             character->is_monster = true;
             character->max_hp = 25000;
@@ -127,20 +171,24 @@ void recover_hp(Character* character, int hp) {
     }
 }
 
-Ability get_random_ability(Character* character) {
+int get_random_character_id(int n_characters) {
+    return  (int) (rand() % n_characters);
+}
+
+int get_random_ability_id(Character* monster) {
     double prob = ((double) rand()) / ((double) RAND_MAX);
     double current_prob = 0;
-    Ability selected;
-    for (int id = 0; id < character->n_abilities; id++) {
-        if ((current_prob <= prob) && (prob < current_prob + character->probabilities[id])) {
-            selected =  character->abilities[id];
+    int selected;
+    for (int id = 0; id < monster->n_abilities; id++) {
+        if ((current_prob <= prob) && (prob < current_prob + monster->probabilities[id])) {
+            selected = id;
             break;
         }
-        current_prob += character->probabilities[id];
+        current_prob += monster->probabilities[id];
     }
     // Checks jump can be used
-    if ((selected == SALTO) && (character->jumped)) {
-        return ESPINA_VENENOSA;
+    if ((monster->abilities[selected] == SALTO) && (monster->jumped)) {
+        return 1;
     };
     return selected;
 }
@@ -274,32 +322,33 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
     }
 }
 
-void apply_status_effects(Character* character) {
+void apply_status_effects(Character** characters, int n_characters) {
 
-    // Update buff counters
-    Buff* this_buff = character->buffs;
-    Buff* new_head  = character->buffs;
-    for (int buff = 0; buff < character->n_buffs; buff++){
-        this_buff->rounds--;
-        if (this_buff->rounds == 0) {
-            new_head = this_buff->next_buff;
-        } else {
-            break;
+    for (int c = 0; c < n_characters; c++) {
+        // Update buff counters
+        Buff* this_buff = characters[c]->buffs;
+        Buff* new_head  = characters[c]->buffs;
+        for (int buff = 0; buff < characters[c]->n_buffs; buff++){
+            this_buff->rounds--;
+            if (this_buff->rounds == 0) {
+                new_head = this_buff->next_buff;
+            } else {
+                break;
+            }
+            this_buff = this_buff -> next_buff;
         }
-        this_buff = this_buff -> next_buff;
-    }
 
-    // Intoxicated decrease counter
-    if (character->intoxicated_counter > 0) {
-        character->intoxicated_counter--;
-        lose_hp(character, 500);
-    }
+        // Intoxicated decrease counter
+        if (characters[c]->intoxicated_counter > 0) {
+            characters[c]->intoxicated_counter--;
+            lose_hp(characters[c], 500);
+        }
 
-    // Bleeding loss hp
-    for (int i = 0; i < character->bleeding_counter; i++) {
-        lose_hp(character, 500);
+        // Bleeding loss hp
+        for (int i = 0; i < characters[c]->bleeding_counter; i++) {
+            lose_hp(characters[c], 500);
+        }
     }
-
 }
 
 // Destroy character
@@ -352,4 +401,17 @@ void copy_ability(Character* attacker, int n_characters, Character** characters,
     Ability ab_sel = characters[player_abl_sel]->abilities[ability_ind_sel];
     // Use the selected ability
     use_ability(attacker, characters[player_def_sel], ab_sel, n_characters, characters, round);
+}
+
+// Get random monster to fight
+Class get_random_monster() {
+    int chosen = rand() % 3;
+    switch (chosen) {
+        case 0:
+            return GREAT_JAGRUZ;
+        case 1:
+            return RUZALOS;
+        case 2:
+            return RUIZ;
+    }
 }
