@@ -91,7 +91,7 @@ Character* create_character(Class type) {
             character->probabilities[1] = 0.5;
 
             character->abilities = malloc(sizeof(Ability) * 2);
-            character->abilities[0] = RUZALOS;
+            character->abilities[0] = RUZGAR;
             character->abilities[1] = COLETAZO;
 
             character->ability_names[0] = "Ruzalos";
@@ -154,9 +154,9 @@ Character* create_character(Class type) {
 // Damage character
 void lose_hp(Character* character, int hp) {
     if (character->failed) {
-        hp = (int) (1.5 * (float) hp);
+        hp = (int)(1.5 * (float)hp);
     }
-    character->current_hp -= (int) hp;
+    character->current_hp -= (int)hp;
     if (character->current_hp < 0) {
         character->current_hp = 0;
         character->is_active = false;
@@ -165,18 +165,18 @@ void lose_hp(Character* character, int hp) {
 
 // Heal character
 void recover_hp(Character* character, int hp) {
-    character->current_hp += (int) hp;
+    character->current_hp += (int)hp;
     if (character->current_hp > character->max_hp) {
         character->current_hp = character->max_hp;
     }
 }
 
 int get_random_character_id(int n_characters) {
-    return  (int) (rand() % n_characters);
+    return  (int)(rand() % n_characters);
 }
 
 int get_random_ability_id(Character* monster) {
-    double prob = ((double) rand()) / ((double) RAND_MAX);
+    double prob = ((double)rand()) / ((double)RAND_MAX);
     double current_prob = 0;
     int selected;
     for (int id = 0; id < monster->n_abilities; id++) {
@@ -203,11 +203,11 @@ double get_character_multiplier(Character* character) {
 
     double multiplier = 1.0;
     Buff* this_buff = character->buffs;
-    for (int buff = 0; buff < character->n_buffs; buff++){
+    for (int buff = 0; buff < character->n_buffs; buff++) {
         multiplier *= this_buff->multiplier;
         this_buff = this_buff->next_buff;
     }
-    if (character->failed){
+    if (character->failed) {
         multiplier *= 0.5;
     }
     return multiplier;
@@ -251,7 +251,7 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
             damage = (750 + (rand() % 1250)) * get_character_multiplier(attacker);
             lose_hp(defender, damage);
 
-            if (attacker->is_monster){ // If the attacker was a montser
+            if (attacker->is_monster) { // If the attacker was a montser
                 recover_hp(attacker, ceil(damage / 2));
             } else { // Select a random character to heal
                 recover_hp(characters[rand() % n_characters], ceil(damage / 2));
@@ -327,15 +327,15 @@ void apply_status_effects(Character** characters, int n_characters) {
     for (int c = 0; c < n_characters; c++) {
         // Update buff counters
         Buff* this_buff = characters[c]->buffs;
-        Buff* new_head  = characters[c]->buffs;
-        for (int buff = 0; buff < characters[c]->n_buffs; buff++){
+        Buff* new_head = characters[c]->buffs;
+        for (int buff = 0; buff < characters[c]->n_buffs; buff++) {
             this_buff->rounds--;
             if (this_buff->rounds == 0) {
                 new_head = this_buff->next_buff;
             } else {
                 break;
             }
-            this_buff = this_buff -> next_buff;
+            this_buff = this_buff->next_buff;
         }
 
         // Intoxicated decrease counter
@@ -357,7 +357,7 @@ void destroy_character(Character* character) {
     // Clean memory from buffs
     Buff* next_buff = character->buffs;
     Buff* this_buff;
-    for (int buff = 0; buff <  character->n_buffs; buff++) {
+    for (int buff = 0; buff < character->n_buffs; buff++) {
         this_buff = next_buff;
         next_buff = this_buff->next_buff;
         free(this_buff);
@@ -377,12 +377,12 @@ void add_buff(Character* character) {
     new_buff->next_buff = NULL;
 
     // creates a new buff for the defender
-    if (character->n_buffs == 0){
+    if (character->n_buffs == 0) {
         character->buffs = new_buff;
         character->n_buffs++;
     } else {
         Buff* last_buff = character->buffs;
-        for (int buff = 1; buff < character->n_buffs; buff++){
+        for (int buff = 1; buff < character->n_buffs; buff++) {
             last_buff = last_buff->next_buff;
         }
         last_buff->next_buff = new_buff;
@@ -393,11 +393,11 @@ void add_buff(Character* character) {
 
 void copy_ability(Character* attacker, int n_characters, Character** characters, int round) {
     // Select a random player
-    int player_abl_sel = (int) (rand() % n_characters);
+    int player_abl_sel = (int)(rand() % n_characters);
     // Select random ability
-    int ability_ind_sel = (int) (rand() % characters[player_abl_sel]->n_abilities);
+    int ability_ind_sel = (int)(rand() % characters[player_abl_sel]->n_abilities);
     // Select random target
-    int player_def_sel = (int) (rand() % n_characters);
+    int player_def_sel = (int)(rand() % n_characters);
     Ability ab_sel = characters[player_abl_sel]->abilities[ability_ind_sel];
     // Use the selected ability
     use_ability(attacker, characters[player_def_sel], ab_sel, n_characters, characters, round);
@@ -406,6 +406,7 @@ void copy_ability(Character* attacker, int n_characters, Character** characters,
 // Get random monster to fight
 Class get_random_monster() {
     int chosen = rand() % 3;
+    Class selected;
     switch (chosen) {
         case 0:
             return GREAT_JAGRUZ;
@@ -414,4 +415,5 @@ Class get_random_monster() {
         case 2:
             return RUIZ;
     }
+    return selected;
 }

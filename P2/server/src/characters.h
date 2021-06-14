@@ -13,7 +13,7 @@ typedef enum character_class {
     HACKER,
     GREAT_JAGRUZ,
     RUZALOS,
-    RUIZ
+    RUIZ,
 } Class;
 
 // Attacks
@@ -51,22 +51,22 @@ typedef struct character Character;
 struct character {
 
     // Stats
-    bool is_monster;
-    bool is_active;
-    int current_hp;
-    int max_hp;
-    
+    bool is_monster;    // True is character is a monster
+    bool is_active;     // True is character is alive
+    int current_hp;     // Current health
+    int max_hp;         // Maximum health
+
     // Define class name and type
-    char* class_name;
-    Class type;
+    char* class_name;   // Class name or monster name
+    Class type;         // Class enum
 
     // Character abilities
     int n_abilities;
     Ability* abilities;
-    double* probabilities;
-    char* ability_names[3];
-    int enemy_target[3];
-    int selected_skill_id;
+    double* probabilities;  // (Monsters) Contains the prob of each ability
+    char* ability_names[3]; // Contains the ability name @ position x
+    int enemy_target[3];    // Tells if the ability in pos x attacks an enemy
+    int selected_skill_id;  // The next ability to be used.
 
     // Damage counters
     int intoxicated_counter;

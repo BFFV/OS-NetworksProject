@@ -23,6 +23,7 @@ Game* init_game(int max_players) {
 
 // Check game state
 void check_state(Game* game) {
+
     // Check for dead monster
     if (game->monster->current_hp <= 0) {
         char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
@@ -36,8 +37,8 @@ void check_state(Game* game) {
         if (game->current_player < (game->num_players - 1)) {
             game->current_player++;
 
-        // The round has ended, it's time for the monster to attack
         } else {
+            // The round has ended, it's time for the monster to attack
             monster_turn(game);
             apply_status_effects(game->characters, game->num_players);
             // TODO: death
@@ -66,6 +67,7 @@ void destroy_game(Game* game) {
 
 // Map pkg_id to request type
 Request get_request_type(int pkg_id) {
+    Request type;
     switch (pkg_id) {
         case 0:
             return DISCONNECT;
@@ -87,7 +89,10 @@ Request get_request_type(int pkg_id) {
             return CONTINUE;
         case 9:
             return MESSAGE;
+        case 10:
+            return TURN;
     }
+    return type;
 }
 
 // Map request type to pkg_id
@@ -113,6 +118,8 @@ int get_pkg_id(Request request_type) {
             return 8;
         case MESSAGE:
             return 9;
+        case TURN:
+            return 10;
     }
 }
 
@@ -146,7 +153,7 @@ void await_requests(int server_socket, Game* game) {
         max_sd = server_socket;
 
         // Add child sockets to set
-        for (int d = 0 ; d < game->max_players; d++) {
+        for (int d = 0; d < game->max_players; d++) {
 
             // Socket descriptor
             sd = game->players[d];
@@ -170,12 +177,12 @@ void await_requests(int server_socket, Game* game) {
 
             // Invalid new player
             if ((game->num_players == game->max_players) || (game->playing)) {
-                int invalid_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
+                int invalid_player = accept(server_socket, (struct sockaddr*)&client_addr, &addr_size);
                 char* invalid_msg = "\nNo es posible conectarse al juego actualmente!\n";
                 server_send_message(invalid_player, get_pkg_id(MESSAGE), invalid_msg);
                 close(invalid_player);
             } else {  // Accept new player
-                new_player = accept(server_socket, (struct sockaddr*) &client_addr, &addr_size);
+                new_player = accept(server_socket, (struct sockaddr*)&client_addr, &addr_size);
                 game->players[game->num_players] = new_player;
                 game->num_players++;
 
@@ -216,6 +223,7 @@ void await_requests(int server_socket, Game* game) {
             sd = game->players[p];
             if (FD_ISSET(sd, &readfds)) {
                 if ((game->playing && game->current_player == p) || (!game->playing)) {
+
                     // Package ID
                     int pkg_id = server_receive_id(sd);
 
@@ -229,6 +237,7 @@ void await_requests(int server_socket, Game* game) {
 
 // Process request from client
 void process_request(Request req_type, int client, int player, Game* game) {
+
     switch (req_type) {
 
         case DISCONNECT:
@@ -387,6 +396,8 @@ void select_monster(int client, int player, Game* game) {
             monster = create_character(get_random_monster());
             break;
     }
+    // Set game monsters
+    game->monster = monster;
 
     // Notify all game users that the game has started
     char* raw_text_0 = "\nEl juego ha comenzado! Pelearán contra el temible monstruo: ";
@@ -409,68 +420,73 @@ void start_turn(int client, int player, Game* game) {
     // Information for leader
     if (!player) {
         char* game_stats_raw[3 + game->num_players];
-        char* game_stats_raw_text;
 
         // Build notification message
-        game_stats_raw_text = "$$$$$$$$$$$ STATS $$$$$$$$$$$$\n";
-        game_stats_raw[0] = game_stats_raw_text;
+        char* game_stats_raw_header = "$$$$$$$$$$$ STATS $$$$$$$$$$$$\n";
+        game_stats_raw[0] = game_stats_raw_header;
 
         // Get each player stats
+        char* players_messages[game->num_players];
         for (int p = 0; p < game->num_players; p++) {
-            char* player_raw_line[7];
-            char* raw_line_text;
+            char* player_raw_line[8];
 
             // Build character stats line
             player_raw_line[0] = game->usernames[p];
-            raw_line_text = "[";
-            player_raw_line[1] = raw_line_text;
+            char* raw_line_text_0 = "[";
+            player_raw_line[1] = raw_line_text_0;
             player_raw_line[2] = game->characters[p]->class_name;
-            raw_line_text = "] -> VIDA: ";
-            player_raw_line[3] = raw_line_text;
-            char* current_hp = itoa(game->characters[p]->current_hp);
-            strcpy(player_raw_line[4], current_hp);
-            player_raw_line[5] = " / ";
-            char* max_hp = itoa(game->characters[p]->max_hp);
-            strcpy(player_raw_line[6], max_hp);
-            player_raw_line[7] = "\n";
-            free(current_hp);
-            free(max_hp);
+            char* raw_line_text_1 = "] -> VIDA: ";
+            player_raw_line[3] = raw_line_text_1;
+            char* current_health = itoa(game->characters[p]->current_hp);
+            player_raw_line[4] = current_health;
+            char* raw_line_text_2 = " / ";
+            player_raw_line[5] = raw_line_text_2;
+            char* max_health = itoa(game->characters[p]->max_hp);
+            player_raw_line[6] = max_health;
+            char* raw_line_text_3 = "\n";
+            player_raw_line[7] = raw_line_text_3;
 
             // Add line to notification message
-            char* player_stats = concatenate(player_raw_line, 7);
-            strcpy(game_stats_raw[p + 1], player_stats);
-            free(player_stats);
+            char* player_statistics = concatenate(player_raw_line, 8);
+            players_messages[p] = player_statistics;
+            game_stats_raw[p + 1] = players_messages[p];
+            free(current_health);
+            free(max_health);
         }
 
-        char* monster_stats_raw[6];
-        char* monster_raw_text;
-
         // Monster stats
+        char* monster_stats_raw[6];
         monster_stats_raw[0] = game->monster->class_name;
-        monster_raw_text = " -> VIDA: ";
-        monster_stats_raw[1] = monster_raw_text;
+        char* monster_raw_text_0 = " -> VIDA: ";
+        monster_stats_raw[1] = monster_raw_text_0;
         char* monster_current_hp = itoa(game->monster->current_hp);
-        strcpy(monster_stats_raw[2], monster_current_hp);
-        monster_raw_text = " / ";
-        monster_stats_raw[3] = monster_raw_text;
+        monster_stats_raw[2] = monster_current_hp;
+        char* monster_raw_text_1 = " / ";
+        monster_stats_raw[3] = monster_raw_text_1;
         char* monster_max_hp = itoa(game->monster->max_hp);
-        strcpy(monster_stats_raw[4], monster_max_hp);
-        monster_raw_text = "\n";
-        monster_stats_raw[5] = monster_raw_text;
-        free(monster_current_hp);
-        free(monster_max_hp);
+        monster_stats_raw[4] = monster_max_hp;
+        char* monster_raw_text_2 = "\n";
+        monster_stats_raw[5] = monster_raw_text_2;
 
         // Concatenate monster stats and add to notification
         char* monster_stats = concatenate(monster_stats_raw, 6);
-        strcpy(game_stats_raw[game->num_players + 1], monster_stats);
-        free(monster_stats);
+        game_stats_raw[1 + game->num_players] = monster_stats;
+        free(monster_current_hp);
+        free(monster_max_hp);
 
         // Concatenate notification and notify all users
-        game_stats_raw_text = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n";
-        game_stats_raw[game->num_players + 3] = game_stats_raw_text; 
+        char* game_stats_raw_footer = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n";
+        game_stats_raw[game->num_players + 2] = game_stats_raw_footer;
         char* notification = concatenate(game_stats_raw, game->num_players + 3);
         notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
+
+        // Free used memory
+        for (int mem = 0; mem < game->num_players; mem++) {
+            free(players_messages[mem]);
+        }
+        free(monster_stats);
         free(notification);
+
     }
 
     // Ask for skill
@@ -517,9 +533,9 @@ void select_objective(int client, int player, Game* game) {
 
     // TODO: retornar un mensaje con lo que hizo la habilidad
     use_ability(player_character,
-                game->characters[objective_id],
-                player_character->abilities[player_character->selected_skill_id],
-                game->num_players, game->characters, game->rounds);
+        game->characters[objective_id],
+        player_character->abilities[player_character->selected_skill_id],
+        game->num_players, game->characters, game->rounds);
     check_state(game);
 }
 
