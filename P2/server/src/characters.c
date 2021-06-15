@@ -40,7 +40,7 @@ char* get_ability_name(Ability ability) {
         case FUERZA_BRUTA:
             name = "Fuerza Bruta";
             break;
-              
+
         case RUZGAR:
             name = "Ruzgar";
             break;
@@ -71,7 +71,6 @@ char* get_ability_name(Ability ability) {
     }
     return name;
 }
-
 
 // Create new character
 Character* create_character(Class type) {
@@ -211,9 +210,9 @@ Character* create_character(Class type) {
 // Damage character
 void lose_hp(Character* character, int hp) {
     if (character->failed) {
-        hp = (int)(1.5 * (float)hp);
+        hp = (int) (1.5 * (float) hp);
     }
-    character->current_hp -= (int)hp;
+    character->current_hp -= (int) hp;
     if (character->current_hp < 0) {
         character->current_hp = 0;
         character->is_active = false;
@@ -222,14 +221,14 @@ void lose_hp(Character* character, int hp) {
 
 // Heal character
 void recover_hp(Character* character, int hp) {
-    character->current_hp += (int)hp;
+    character->current_hp += hp;
     if (character->current_hp > character->max_hp) {
         character->current_hp = character->max_hp;
     }
 }
 
 int get_random_character_id(int n_characters) {
-    return  (int)(rand() % n_characters);
+    return  (int) (rand() % n_characters);
 }
 
 int get_random_ability_id(Character* monster) {
@@ -243,7 +242,7 @@ int get_random_ability_id(Character* monster) {
         }
         current_prob += monster->probabilities[id];
     }
-    // Checks jump can be used
+    // Check if jump can be used
     if ((monster->abilities[selected] == SALTO) && (monster->jumped)) {
         return 1;
     };
@@ -264,12 +263,13 @@ double get_character_multiplier(Character* character) {
         multiplier *= this_buff->multiplier;
         this_buff = this_buff->next_buff;
     }
+
+    // Demoralized
     if (character->failed) {
         multiplier *= 0.5;
     }
     return multiplier;
 };
-
 
 // Use character ability
 void use_ability(Character* attacker, Character* defender, Ability ability, int n_characters, Character** characters, int round) {
@@ -277,17 +277,16 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
     switch (ability) {
 
         case ESTOCADA:
-            lose_hp(defender, 1000 * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (1000 * get_character_multiplier(attacker)));
 
             // Apply bleeding
             if (defender->bleeding_counter < 3) {
                 defender->bleeding_counter++;
             }
-
             break;
 
         case CORTE_CRUZADO:
-            lose_hp(defender, 3000 * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (3000 * get_character_multiplier(attacker)));
             break;
 
         case DISTRAER:
@@ -301,23 +300,23 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
             break;
 
         case CURAR:
-            recover_hp(defender, 2000 * get_character_multiplier(attacker));
+            recover_hp(defender, (int) (2000 * get_character_multiplier(attacker)));
             break;
 
         case DESTELLO_REGENERADOR:
             damage = (750 + (rand() % 1250)) * get_character_multiplier(attacker);
-            lose_hp(defender, damage);
+            lose_hp(defender, (int) damage);
 
-            if (attacker->is_monster) { // If the attacker was a montser
-                recover_hp(attacker, ceil(damage / 2));
+            if (attacker->is_monster) { // If the attacker was a monster
+                recover_hp(attacker, (int) ceil(damage / 2));
             } else { // Select a random character to heal
-                recover_hp(characters[rand() % n_characters], ceil(damage / 2));
+                recover_hp(characters[rand() % n_characters], (int) ceil(damage / 2));
             }
             break;
 
         case DESCARGA_VITAL:
             hp_diff = (attacker->max_hp) - (attacker->current_hp);
-            lose_hp(defender, 2 * hp_diff * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (2 * hp_diff * get_character_multiplier(attacker)));
             break;
 
         case INYECCION_SQL:
@@ -325,29 +324,29 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
             break;
 
         case ATAQUE_DDOS:
-            lose_hp(defender, 1500 * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (1500 * get_character_multiplier(attacker)));
             break;
 
         case FUERZA_BRUTA:
             attacker->brute_force_counter++;
             if (attacker->brute_force_counter == 3) {
-                lose_hp(defender, 10000 * get_character_multiplier(attacker));
+                lose_hp(defender, (int) (10000 * get_character_multiplier(attacker)));
                 attacker->brute_force_counter = 0;
             }
             break;
 
         case RUZGAR:
-            lose_hp(defender, 1000 * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (1000 * get_character_multiplier(attacker)));
             break;
 
         case COLETAZO:
-            for (int ch; ch < n_characters; ch++) {
-                lose_hp(characters[ch], 500 * get_character_multiplier(attacker));
+            for (int ch = 0; ch < n_characters; ch++) {
+                lose_hp(characters[ch], (int) (500 * get_character_multiplier(attacker)));
             }
             break;
 
         case SALTO:
-            lose_hp(defender, 1500 * get_character_multiplier(attacker));
+            lose_hp(defender, (int) (1500 * get_character_multiplier(attacker)));
 
             // Block jump for the next turn
             attacker->jumped = true;
@@ -357,9 +356,10 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
 
             // Check if target already intoxicated
             if (defender->intoxicated_counter > 0) {
-                lose_hp(defender, 500 * get_character_multiplier(attacker));
+                lose_hp(defender, (int) (500 * get_character_multiplier(attacker)));
+            } else {
+                defender->intoxicated_counter = 3;
             }
-            defender->intoxicated_counter = 3;
 
             // Unblock jump for the next turn
             attacker->jumped = false;
@@ -374,7 +374,9 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
             break;
 
         case SUDO_RM_RF:
-            lose_hp(attacker, (100 * round) * get_character_multiplier(attacker));
+            for (int ch = 0; ch < n_characters; ch++) {
+                lose_hp(characters[ch], (int) (100 * round * get_character_multiplier(attacker)));
+            }
             break;
     }
 }
@@ -398,13 +400,11 @@ void apply_status_effects(Character** characters, int n_characters) {
         // Intoxicated decrease counter
         if (characters[c]->intoxicated_counter > 0) {
             characters[c]->intoxicated_counter--;
-            lose_hp(characters[c], 500);
+            lose_hp(characters[c], 400);
         }
 
         // Bleeding loss hp
-        for (int i = 0; i < characters[c]->bleeding_counter; i++) {
-            lose_hp(characters[c], 500);
-        }
+        lose_hp(characters[c], 500 * characters[c]->bleeding_counter);
     }
 }
 
@@ -425,15 +425,16 @@ void destroy_character(Character* character) {
     free(character);
 }
 
+// SQL injection
 void add_buff(Character* character) {
 
     // Creates a new buff for the defender
     Buff* new_buff = malloc(sizeof(Buff));
-    new_buff->rounds = 2 + 1;
+    new_buff->rounds = 2;  // Buff considers this round
     new_buff->multiplier = 2;
     new_buff->next_buff = NULL;
 
-    // creates a new buff for the defender
+    // Creates a new buff for the defender
     if (character->n_buffs == 0) {
         character->buffs = new_buff;
         character->n_buffs++;
@@ -447,7 +448,7 @@ void add_buff(Character* character) {
     }
 }
 
-
+// TODO: Healing only for the monster, show chosen abilities
 void copy_ability(Character* attacker, int n_characters, Character** characters, int round) {
     // Select a random player
     int player_abl_sel = (int)(rand() % n_characters);

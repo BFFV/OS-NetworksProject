@@ -25,7 +25,7 @@ Game* init_game(int max_players) {
 void check_state(Game* game) {
 
     // Check for dead monster
-    if (game->monster->current_hp <= 0) {
+    if (game->monster->current_hp <= 0 && 0) {
         char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
         notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), end_message, -1);
         return;
@@ -80,17 +80,15 @@ Request get_request_type(int pkg_id) {
         case 4:
             return SELECT_MONSTER;
         case 5:
-            return SELECT_SKILL;
+            return SELECT_ACTION;
         case 6:
-            return SELECT_OBJECTIVE;
+            return SELECT_SKILL;
         case 7:
-            return SURRENDER;
+            return SELECT_OBJECTIVE;
         case 8:
             return CONTINUE;
         case 9:
             return MESSAGE;
-        case 10:
-            return TURN;
     }
     return type;
 }
@@ -108,18 +106,16 @@ int get_pkg_id(Request request_type) {
             return 3;
         case SELECT_MONSTER:
             return 4;
-        case SELECT_SKILL:
+        case SELECT_ACTION:
             return 5;
-        case SELECT_OBJECTIVE:
+        case SELECT_SKILL:
             return 6;
-        case SURRENDER:
+        case SELECT_OBJECTIVE:
             return 7;
         case CONTINUE:
             return 8;
         case MESSAGE:
             return 9;
-        case TURN:
-            return 10;
     }
 }
 
@@ -260,6 +256,10 @@ void process_request(Request req_type, int client, int player, Game* game) {
             select_monster(client, player, game);
             break;
 
+        case SELECT_ACTION:
+            select_action(client, player, game);
+            break;
+
         case SELECT_SKILL:
             select_skill(client, player, game);
             break;
@@ -268,16 +268,8 @@ void process_request(Request req_type, int client, int player, Game* game) {
             select_objective(client, player, game);
             break;
 
-        case SURRENDER:
-            // disconnect(client, player, players);
-            break;
-
         case CONTINUE:
             // disconnect(client, player, players);
-            break;
-
-        case TURN:
-            execute_action(client, player, game);
             break;
 
         default:
@@ -330,12 +322,13 @@ void select_class(int client, int player, Game* game) {
     }
     game->characters[player] = new_character;
     char* ready = " está listo para jugar como ";
-    char* msg_notify[4];
-    msg_notify[0] = game->usernames[player];
-    msg_notify[1] = ready;
-    msg_notify[2] = selected;
-    msg_notify[3] = "!\n";
-    char* notify = concatenate(msg_notify, 4);
+    char* msg_notify[5];
+    msg_notify[0] = "\n";
+    msg_notify[1] = game->usernames[player];
+    msg_notify[2] = ready;
+    msg_notify[3] = selected;
+    msg_notify[4] = "!\n";
+    char* notify = concatenate(msg_notify, 5);
     server_send_message(client, get_pkg_id(MESSAGE), notify);
     if (player) {
         server_send_message(game->players[0], get_pkg_id(MESSAGE), notify);
@@ -366,10 +359,9 @@ void start_game(int client, int player, Game* game) {
     }
 
     // All players ready
-    printf("READY\n");
     game->playing = true;
     game->current_player = 0;
-    char* select_monster_msg = "\nSelecciona un monstruo contra el que combatir:\n\n1) Great JagRuz\n2) Ruzalos\n3) Ruiz, el Gemelo Malvado del Profesor Ruz\n4) Monstruo Aleatorio\n";
+    char* select_monster_msg = "\nSelecciona un monstruo contra el que combatir:\n\n1) Great JagRuz\n2) Ruzalos\n3) Ruiz, el Gemelo Malvado del Profesor Ruz\n4) Monstruo Aleatorio\n\n";
     server_send_message(client, get_pkg_id(SELECT_MONSTER), select_monster_msg);
 }
 
@@ -405,10 +397,10 @@ void select_monster(int client, int player, Game* game) {
 
     // Notify all game users that the game has started
     char* raw_text_0 = "\nEl juego ha comenzado! Pelearán contra el temible monstruo: ";
-    char* raw_text_1 = "...\n";
+    char* raw_text_1 = "\n";
     char* raw_msg[3];
     raw_msg[0] = raw_text_0;
-    raw_msg[1] = monster_name;
+    raw_msg[1] = game->monster->class_name;
     raw_msg[2] = raw_text_1;
     char* start_msg = concatenate(raw_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), start_msg, -1);
@@ -422,89 +414,94 @@ void select_monster(int client, int player, Game* game) {
 void start_turn(int client, int player, Game* game) {
 
     // Information for leader
-    if (!player) {
-        char* game_stats_raw[3 + game->num_players];
+    char* game_stats_raw[3 + game->num_players];
 
-        // Build notification message
-        char* game_stats_raw_header = "$$$$$$$$$$$ STATS $$$$$$$$$$$$\n";
-        game_stats_raw[0] = game_stats_raw_header;
+    // Build notification message
+    char* game_stats_raw_header = "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$ STATS $$$$$$$$$$$$$$$$$$$$$$$$$$$$\n";
+    game_stats_raw[0] = game_stats_raw_header;
 
-        // Get each player stility_names[selected_ability_id]ats
-        char* players_messages[game->num_players];
-        for (int p = 0; p < game->num_players; p++) {
-            char* player_raw_line[8];
+    // Get each player ability_names[selected_ability_id]ats
+    char* players_messages[game->num_players];
+    for (int p = 0; p < game->num_players; p++) {
+        char* player_raw_line[8];
 
-            // Build character stats line
-            player_raw_line[0] = game->usernames[p];
-            char* raw_line_text_0 = "[";
-            player_raw_line[1] = raw_line_text_0;
-            player_raw_line[2] = game->characters[p]->class_name;
-            char* raw_line_text_1 = "] -> VIDA: ";
-            player_raw_line[3] = raw_line_text_1;
-            char* current_health = itoa(game->characters[p]->current_hp);
-            player_raw_line[4] = current_health;
-            char* raw_line_text_2 = " / ";
-            player_raw_line[5] = raw_line_text_2;
-            char* max_health = itoa(game->characters[p]->max_hp);
-            player_raw_line[6] = max_health;
-            char* raw_line_text_3 = "\n";
-            player_raw_line[7] = raw_line_text_3;
+        // Build character stats line
+        player_raw_line[0] = game->usernames[p];
+        char* raw_line_text_0 = " [";
+        player_raw_line[1] = raw_line_text_0;
+        player_raw_line[2] = game->characters[p]->class_name;
+        char* raw_line_text_1 = "] -> VIDA: ";
+        player_raw_line[3] = raw_line_text_1;
+        char* current_health = itoa(game->characters[p]->current_hp);
+        player_raw_line[4] = current_health;
+        char* raw_line_text_2 = " / ";
+        player_raw_line[5] = raw_line_text_2;
+        char* max_health = itoa(game->characters[p]->max_hp);
+        player_raw_line[6] = max_health;
+        char* raw_line_text_3 = "\n";
+        player_raw_line[7] = raw_line_text_3;
 
-            // Add line to notification message
-            char* player_statistics = concatenate(player_raw_line, 8);
-            players_messages[p] = player_statistics;
-            game_stats_raw[p + 1] = players_messages[p];
-            free(current_health);
-            free(max_health);
-        }
-
-        // Monster stats
-        char* monster_stats_raw[6];
-        monster_stats_raw[0] = game->monster->class_name;
-        char* monster_raw_text_0 = " -> VIDA: ";
-        monster_stats_raw[1] = monster_raw_text_0;
-        char* monster_current_hp = itoa(game->monster->current_hp);
-        monster_stats_raw[2] = monster_current_hp;
-        char* monster_raw_text_1 = " / ";
-        monster_stats_raw[3] = monster_raw_text_1;
-        char* monster_max_hp = itoa(game->monster->max_hp);
-        monster_stats_raw[4] = monster_max_hp;
-        char* monster_raw_text_2 = "\n";
-        monster_stats_raw[5] = monster_raw_text_2;
-
-        // Concatenate monster stats and add to notification
-        char* monster_stats = concatenate(monster_stats_raw, 6);
-        game_stats_raw[1 + game->num_players] = monster_stats;
-        free(monster_current_hp);
-        free(monster_max_hp);
-
-        // Concatenate notification and notify all users
-        char* game_stats_raw_footer = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n";
-        game_stats_raw[game->num_players + 2] = game_stats_raw_footer;
-        char* notification = concatenate(game_stats_raw, game->num_players + 3);
-        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
-
-        // Free used memory
-        for (int mem = 0; mem < game->num_players; mem++) {
-            free(players_messages[mem]);
-        }
-        free(monster_stats);
-        free(notification);
-
+        // Add line to notification message
+        char* player_statistics = concatenate(player_raw_line, 8);
+        players_messages[p] = player_statistics;
+        game_stats_raw[p + 1] = players_messages[p];
+        free(current_health);
+        free(max_health);
     }
+
+    // Monster stats
+    char* monster_stats_raw[7];
+    monster_stats_raw[0] = game->monster->class_name;
+    monster_stats_raw[1] = " [MONSTRUO]";
+    char* monster_raw_text_0 = " -> VIDA: ";
+    monster_stats_raw[2] = monster_raw_text_0;
+    char* monster_current_hp = itoa(game->monster->current_hp);
+    monster_stats_raw[3] = monster_current_hp;
+    char* monster_raw_text_1 = " / ";
+    monster_stats_raw[4] = monster_raw_text_1;
+    char* monster_max_hp = itoa(game->monster->max_hp);
+    monster_stats_raw[5] = monster_max_hp;
+    char* monster_raw_text_2 = "\n";
+    monster_stats_raw[6] = monster_raw_text_2;
+
+    // Concatenate monster stats and add to notification
+    char* monster_stats = concatenate(monster_stats_raw, 7);
+    game_stats_raw[1 + game->num_players] = monster_stats;
+    free(monster_current_hp);
+    free(monster_max_hp);
+
+    // Concatenate notification and notify all users
+    char* game_stats_raw_footer = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n";
+    game_stats_raw[game->num_players + 2] = game_stats_raw_footer;
+    char* notification = concatenate(game_stats_raw, game->num_players + 3);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
+
+    // Free used memory
+    for (int mem = 0; mem < game->num_players; mem++) {
+        free(players_messages[mem]);
+    }
+    free(monster_stats);
+    free(notification);
 
     // Ask for action
     send_select_action_message(game, player);
 }
 
 // Select action
-void execute_action(int client, int player, Game* game){
+void select_action(int client, int player, Game* game) {
     int action_id = atoi(server_receive_payload(client)) - 1;
-    if(!action_id){
+
+    // Keep fighting
+    if (!action_id) {
         send_select_skill_message(game, player);
         return;
     }
+
+    // Surrender
     game->characters[player]->is_active = false;
+
+    // Check game state
+    check_state(game);
 }
 
 // Select skill
@@ -541,19 +538,20 @@ void select_objective(int client, int player, Game* game) {
         game->num_players, game->characters, game->rounds);
 
     // TODO: esta notificación debe ser entregada por el use_ability
-    char* raw_notification[6];
-    raw_notification[0] = game->usernames[player];
-    char* raw_not_text_1 = " usó la habilidad -";
-    raw_notification[1] = raw_not_text_1;
-    raw_notification[2] = get_ability_name(selected_skill);
-    char* raw_not_text_2 = "- en su aliado ";
-    raw_notification[3] = raw_not_text_2;
-    raw_notification[4] = game->usernames[objective_id];
-    char* newline = "\n";
-    raw_notification[5] = newline;
+    char* raw_notification[7];
+    raw_notification[0] = "\n";
+    raw_notification[1] = game->usernames[player];
+    char* raw_not_text_1 = " usó la habilidad <";
+    raw_notification[2] = raw_not_text_1;
+    raw_notification[3] = get_ability_name(selected_skill);
+    char* raw_not_text_2 = "> en su aliado ";
+    raw_notification[4] = raw_not_text_2;
+    raw_notification[5] = game->usernames[objective_id];
+    char* newline = "!\n";
+    raw_notification[6] = newline;
 
     // Send notification to all players
-    char* notification_msg = concatenate(raw_notification, 6);
+    char* notification_msg = concatenate(raw_notification, 7);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
     free(notification_msg);
 
@@ -563,32 +561,32 @@ void select_objective(int client, int player, Game* game) {
 
 // ----------- Helper Functions ----------- //
 
+// Send action selection message
 void send_select_action_message(Game* game, int player) {
     // Notify all users except the current player
     char* raw_notification_msg[2];
     raw_notification_msg[0] = game->usernames[player];
     char* raw_not_text = " está realizando su turno...\n";
     raw_notification_msg[1] = raw_not_text;
-    char* notification_msg = concatenate(raw_notification_msg, 3);
+    char* notification_msg = concatenate(raw_notification_msg, 2);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
     free(notification_msg);
 
     // Send select action to current player
     Character* current_player = game->characters[player];
-    char* message = "\n¿Qué vas a hacer?:\n1) Luchar\n2) Rendirse\n";
+    char* message = "\n¿Qué vas a hacer?:\n\n1) Luchar\n2) Rendirte\n\n";
 
     // Send message to user
-    server_send_message(game->players[player], get_pkg_id(TURN), message);
+    server_send_message(game->players[player], get_pkg_id(SELECT_ACTION), message);
 }
-
 
 // Send skill selection message
 void send_select_skill_message(Game* game, int player) {
 
     // Send select skill to current player
     Character* current_player = game->characters[player];
-    char* raw_select_msg[1 + current_player->n_abilities];
-    char* raw_select_header = "\nElige una de las siguientes habilidades:\n";
+    char* raw_select_msg[2 + current_player->n_abilities];
+    char* raw_select_header = "\nElige una de las siguientes habilidades:\n\n";
     raw_select_msg[0] = raw_select_header;
 
     char* player_abilities[current_player->n_abilities];
@@ -608,9 +606,10 @@ void send_select_skill_message(Game* game, int player) {
         raw_select_msg[1 + a] = player_abilities[a];
         free(index);
     }
+    raw_select_msg[1 + current_player->n_abilities] = "\n";
 
     // Send message to user
-    char* select_message = concatenate(raw_select_msg, 1 + current_player->n_abilities);
+    char* select_message = concatenate(raw_select_msg, 2 + current_player->n_abilities);
     server_send_message(game->players[player], get_pkg_id(SELECT_SKILL), select_message);
     free(select_message);
 
@@ -622,12 +621,12 @@ void send_select_skill_message(Game* game, int player) {
 
 // Send objective message if needed
 void send_select_objective_message(Game* game, int player) {
+    Character* current_character = game->characters[player];
 
     // Select objective menu
-    char* raw_selection_menu[1 + game->num_players];
-    char* raw_selection_header = "Selecciona objetivo:\n";
+    char* raw_selection_menu[2 + game->num_players];
+    char* raw_selection_header = "\nSelecciona un aliado:\n\n";
     raw_selection_menu[0] = raw_selection_header;
-
     char* objectives_lines[game->num_players];
     for (int p = 0; p < game->num_players; p++) {
 
@@ -637,7 +636,7 @@ void send_select_objective_message(Game* game, int player) {
         raw_objective_line[0] = index;
         char* raw_objective_text_0 = ") ";
         raw_objective_line[1] = raw_objective_text_0;
-        raw_objective_line[2] = game->usernames[player];
+        raw_objective_line[2] = game->usernames[p];
         char* raw_objective_text_1 = " [";
         raw_objective_line[3] = raw_objective_text_1;
         char* current_health = itoa(game->characters[p]->current_hp);
@@ -656,9 +655,10 @@ void send_select_objective_message(Game* game, int player) {
         free(max_health);
         free(index);
     }
+    raw_selection_menu[1 + game->num_players] = "\n";
 
     // Send menu to user
-    char* select_message = concatenate(raw_selection_menu, 1 + game->num_players);
+    char* select_message = concatenate(raw_selection_menu, 2 + game->num_players);
     server_send_message(game->players[player], get_pkg_id(SELECT_OBJECTIVE), select_message);
     free(select_message);
 
@@ -670,6 +670,21 @@ void send_select_objective_message(Game* game, int player) {
 
 // The monster uses an ability on a random user
 void monster_turn(Game* game) {
+
+    // Bleeding effect
+    lose_hp(game->monster, 500 * game->monster->bleeding_counter);
+    if (game->monster->bleeding_counter) {
+        char* monster_bleed[5];
+        monster_bleed[0] = "\nMONSTRUO: ";
+        monster_bleed[1] = game->monster->class_name;
+        monster_bleed[2] = " perdió ";
+        monster_bleed[3] = itoa(500 * game->monster->bleeding_counter);
+        monster_bleed[4] = " puntos de vida debido al sangrado!\n";
+        char* bleed_msg = concatenate(monster_bleed, 5);
+        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), bleed_msg, -1);
+        free(monster_bleed[3]);
+        free(bleed_msg);
+    }
 
     // Get random ability
     int selected_ability_id = get_random_ability_id(game->monster);
@@ -695,16 +710,21 @@ void monster_turn(Game* game) {
 
     // TODO: Esta notificación debería retornarse en el use_ability
     // Notifies users of the monster attack
-    char* raw_notification[5];
-    char* raw_notification_header = "\nEl monstruo usó la habilidad -";
-    raw_notification[0] = raw_notification_header;
-    raw_notification[1] = get_ability_name(selected_ability);
-    char* raw_not_text_2 = "- sobre ";
-    raw_notification[2] = raw_not_text_2;
-    raw_notification[3] = game->usernames[defender_player_id];
-    char* newline = "\n";
-    raw_notification[4] = newline;
-    char* notification_msg = concatenate(raw_notification, 5);
+    char* raw_notification[7];
+    raw_notification[0] = "\nMONSTRUO: ";
+    raw_notification[1] = game->monster->class_name;
+    raw_notification[2] = " usó la habilidad <";
+    raw_notification[3] = get_ability_name(selected_ability);
+    char* raw_not_text_2 = "> sobre ";
+    raw_notification[4] = raw_not_text_2;
+    if (selected_ability == COLETAZO || selected_ability == SUDO_RM_RF) {
+        raw_notification[5] = "todos";
+    } else {
+        raw_notification[5] = game->usernames[defender_player_id];
+    }
+    char* newline = "!\n";
+    raw_notification[6] = newline;
+    char* notification_msg = concatenate(raw_notification, 7);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
     free(notification_msg);
 }

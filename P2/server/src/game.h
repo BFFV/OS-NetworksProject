@@ -27,12 +27,11 @@ typedef enum request_types {
     SELECT_CLASS,
     START_GAME,
     SELECT_MONSTER,
-    SELECT_SKILL,  // SERVER only
+    SELECT_ACTION,
+    SELECT_SKILL,
     SELECT_OBJECTIVE,
-    SURRENDER,  // SERVER only
     CONTINUE,
-    MESSAGE,  // CLIENT only
-    TURN,  // CLIENT only: Includes skill selection, surrender, disconnect
+    MESSAGE,
 } Request;
 
 
@@ -94,7 +93,7 @@ void select_monster(int client, int player, Game* game);
 void start_turn(int client, int player, Game* game);
 
 // Select action
-void execute_action(int client, int player, Game* game);
+void select_action(int client, int player, Game* game);
 
 // Select skill
 void select_skill(int client, int player, Game* game);
