@@ -495,47 +495,57 @@ void start_turn(int client, int player, Game* game) {
 
 // Select skill
 void select_skill(int client, int player, Game* game) {
+
+    // Set selected skill
     int skill_id = atoi(server_receive_payload(client)) - 1;
     Ability selected = get_ability(game->characters[player], skill_id);
     game->characters[player]->selected_skill_id = skill_id;
+
+    // Ability targets an enemy
     if (game->characters[player]->enemy_target[skill_id]) {
-        use_ability(game->characters[player], game->monster, selected, game->num_players, game->characters, game->rounds);
         // TODO: Notify action
+        use_ability(game->characters[player], game->monster, selected, game->num_players, game->characters, game->rounds);
         check_state(game);
         return;
     }
-    select_objective(client, player, game);
+
+    // Selecting an objective
+    send_select_objective_message(game, player);
 }
 
 // Select objective
 void select_objective(int client, int player, Game* game) {
-    Character* player_character = game->characters[player];
-    int objective_id = atoi(server_receive_payload(client)) - 1;
 
-    // Notifies other users about the action
-    char* raw_notification[7];
-    char* raw_notification_header = "\n";
-    raw_notification[0] = raw_notification_header;
-    raw_notification[1] = game->usernames[player];
+    // Get attacker and selected id
+    Character* player_character = game->characters[player];
+    Ability selected_skill = player_character->abilities[player_character->selected_skill_id];
+
+    // Get objective from payload
+    int objective_id = atoi(server_receive_payload(client)) - 1;
+    Character* defender = game->characters[objective_id];
+
+    // TODO: retornar un mensaje con lo que hizo la habilidad
+    use_ability(player_character, defender, selected_skill,
+        game->num_players, game->characters, game->rounds);
+
+    // TODO: esta notificación debe ser entregada por el use_ability
+    char* raw_notification[6];
+    raw_notification[0] = game->usernames[player];
     char* raw_not_text_1 = " usó la habilidad -";
-    raw_notification[2] = raw_not_text_1;
-    raw_notification[3] = player_character->ability_names[player_character->selected_skill_id];
+    raw_notification[1] = raw_not_text_1;
+    raw_notification[2] = get_ability_name(selected_skill);
     char* raw_not_text_2 = "- en su aliado ";
-    raw_notification[4] = raw_not_text_2;
-    raw_notification[5] = game->usernames[objective_id];
+    raw_notification[3] = raw_not_text_2;
+    raw_notification[4] = game->usernames[objective_id];
     char* newline = "\n";
-    raw_notification[6] = newline;
+    raw_notification[5] = newline;
 
     // Send notification to all players
-    char* notification_msg = concatenate(raw_notification, 7);
+    char* notification_msg = concatenate(raw_notification, 6);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
     free(notification_msg);
 
-    // TODO: retornar un mensaje con lo que hizo la habilidad
-    use_ability(player_character,
-        game->characters[objective_id],
-        player_character->abilities[player_character->selected_skill_id],
-        game->num_players, game->characters, game->rounds);
+    // Check state of the board and pass to the next turn
     check_state(game);
 }
 
@@ -590,27 +600,50 @@ void send_select_skill_message(Game* game, int player) {
 
 // Send objective message if needed
 void send_select_objective_message(Game* game, int player) {
-    char* raw_select_msg[1 + game->num_players];
-    char* raw_header = "Selecciona objetivo:\n";
-    raw_select_msg[0] = raw_header;
 
+    // Select objective menu
+    char* raw_selection_menu[1 + game->num_players];
+    char* raw_selection_header = "Selecciona objetivo:\n";
+    raw_selection_menu[0] = raw_selection_header;
+
+    char* objectives_lines[game->num_players];
     for (int p = 0; p < game->num_players; p++) {
-        char* raw_objective_line[4];
+
+        // Parse player name and life
+        char* raw_objective_line[8];
         char* index = itoa(p + 1);
-        strcpy(raw_objective_line[0], index);
-        char* raw_obj_par = ") ";
-        raw_objective_line[1] = raw_obj_par;
+        raw_objective_line[0] = index;
+        char* raw_objective_text_0 = ") ";
+        raw_objective_line[1] = raw_objective_text_0;
         raw_objective_line[2] = game->usernames[player];
-        char* newline = ".\n";
-        raw_objective_line[3] = newline;
-        char* objective_line = concatenate(raw_objective_line, 4);
-        strcpy(raw_select_msg[p], objective_line);
-        free(objective_line);
+        char* raw_objective_text_1 = " [";
+        raw_objective_line[3] = raw_objective_text_1;
+        char* current_health = itoa(game->characters[p]->current_hp);
+        raw_objective_line[4] = current_health;
+        char* raw_objective_text_2 = " / ";
+        raw_objective_line[5] = raw_objective_text_2;
+        char* max_health = itoa(game->characters[p]->max_hp);
+        raw_objective_line[6] = max_health;
+        char* raw_objective_text_3 = "]\n";
+        raw_objective_line[7] = raw_objective_text_3;
+
+        char* objective_line = concatenate(raw_objective_line, 8);
+        objectives_lines[p] = objective_line;
+        raw_selection_menu[1 + p] = objectives_lines[p];
+        free(current_health);
+        free(max_health);
         free(index);
     }
-    char* select_message = concatenate(raw_select_msg, 1 + game->num_players);
+
+    // Send menu to user
+    char* select_message = concatenate(raw_selection_menu, 1 + game->num_players);
     server_send_message(game->players[player], get_pkg_id(SELECT_OBJECTIVE), select_message);
     free(select_message);
+
+    // Free memory
+    for (int p = 0; p < game->num_players; p++) {
+        free(objectives_lines[p]);
+    }
 }
 
 // The monster uses an ability on a random user
@@ -643,7 +676,7 @@ void monster_turn(Game* game) {
     char* raw_notification[5];
     char* raw_notification_header = "\nEl monstruo usó la habilidad -";
     raw_notification[0] = raw_notification_header;
-    raw_notification[1] = game->monster->ability_names[selected_ability_id];
+    raw_notification[1] = get_ability_name(selected_ability);
     char* raw_not_text_2 = "- sobre ";
     raw_notification[2] = raw_not_text_2;
     raw_notification[3] = game->usernames[defender_player_id];

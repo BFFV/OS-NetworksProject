@@ -40,6 +40,34 @@ char* get_ability_name(Ability ability) {
         case FUERZA_BRUTA:
             name = "Fuerza Bruta";
             break;
+
+        case RUZGAR:
+            name = "Ruzgar";
+            break;
+
+        case COLETAZO:
+            name = "Coletazo";
+            break;
+
+        case SALTO:
+            name = "Salto";
+            break;
+
+        case ESPINA_VENENOSA:
+            name = "Espina Venenosa";
+            break;
+
+        case CASO_COPIA:
+            name = "Caso Copia";
+            break;
+
+        case REPROBATRON_9000:
+            name = "Reprobaton 9000";
+            break;
+
+        case SUDO_RM_RF:
+            name = "sudo rm -rf";
+            break;
     }
     return name;
 }
