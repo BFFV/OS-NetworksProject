@@ -65,6 +65,8 @@ void process_request(Request req_type, int client, int player, Game* game);
 
 // ----------- Helper Functions ----------- //
 
+void send_select_action_message(Game* game, int player);
+
 void send_select_skill_message(Game* game, int player);
 
 void send_select_objective_message(Game* game, int player);
@@ -90,6 +92,9 @@ void select_monster(int client, int player, Game* game);
 
 // Start turn
 void start_turn(int client, int player, Game* game);
+
+// Select action
+void execute_action(int client, int player, Game* game);
 
 // Select skill
 void select_skill(int client, int player, Game* game);

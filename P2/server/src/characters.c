@@ -40,6 +40,7 @@ char* get_ability_name(Ability ability) {
         case FUERZA_BRUTA:
             name = "Fuerza Bruta";
             break;
+
     }
     return name;
 }

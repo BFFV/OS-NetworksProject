@@ -276,6 +276,10 @@ void process_request(Request req_type, int client, int player, Game* game) {
             // disconnect(client, player, players);
             break;
 
+        case TURN:
+            execute_action(client, player, game);
+            break;
+
         default:
             break;
     }
@@ -425,7 +429,7 @@ void start_turn(int client, int player, Game* game) {
         char* game_stats_raw_header = "$$$$$$$$$$$ STATS $$$$$$$$$$$$\n";
         game_stats_raw[0] = game_stats_raw_header;
 
-        // Get each player stats
+        // Get each player stility_names[selected_ability_id]ats
         char* players_messages[game->num_players];
         for (int p = 0; p < game->num_players; p++) {
             char* player_raw_line[8];
@@ -489,12 +493,23 @@ void start_turn(int client, int player, Game* game) {
 
     }
 
-    // Ask for skill
-    send_select_skill_message(game, player);
+    // Ask for action
+    send_select_action_message(game, player);
+}
+
+// Select action
+void execute_action(int client, int player, Game* game){
+    int action_id = atoi(server_receive_payload(client)) - 1;
+    if(!action_id){
+        send_select_skill_message(game, player);
+        return;
+    }
+    game->characters[player]->is_active = false;
 }
 
 // Select skill
 void select_skill(int client, int player, Game* game) {
+
     int skill_id = atoi(server_receive_payload(client)) - 1;
     Ability selected = get_ability(game->characters[player], skill_id);
     game->characters[player]->selected_skill_id = skill_id;
@@ -510,6 +525,7 @@ void select_skill(int client, int player, Game* game) {
 // Select objective
 void select_objective(int client, int player, Game* game) {
     Character* player_character = game->characters[player];
+    Ability selected_ability = player_character->abilities[player_character->selected_skill_id];
     int objective_id = atoi(server_receive_payload(client)) - 1;
 
     // Notifies other users about the action
@@ -519,7 +535,7 @@ void select_objective(int client, int player, Game* game) {
     raw_notification[1] = game->usernames[player];
     char* raw_not_text_1 = " usó la habilidad -";
     raw_notification[2] = raw_not_text_1;
-    raw_notification[3] = player_character->ability_names[player_character->selected_skill_id];
+    raw_notification[3] = get_ability_name(selected_ability);
     char* raw_not_text_2 = "- en su aliado ";
     raw_notification[4] = raw_not_text_2;
     raw_notification[5] = game->usernames[objective_id];
@@ -532,18 +548,14 @@ void select_objective(int client, int player, Game* game) {
     free(notification_msg);
 
     // TODO: retornar un mensaje con lo que hizo la habilidad
-    use_ability(player_character,
-        game->characters[objective_id],
-        player_character->abilities[player_character->selected_skill_id],
-        game->num_players, game->characters, game->rounds);
+    use_ability(player_character, game->characters[objective_id], selected_ability,\
+                game->num_players, game->characters, game->rounds);
     check_state(game);
 }
 
 // ----------- Helper Functions ----------- //
 
-// Send skill selection message
-void send_select_skill_message(Game* game, int player) {
-
+void send_select_action_message(Game* game, int player) {
     // Notify all users except the current player
     char* raw_notification_msg[2];
     raw_notification_msg[0] = game->usernames[player];
@@ -552,6 +564,18 @@ void send_select_skill_message(Game* game, int player) {
     char* notification_msg = concatenate(raw_notification_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
     free(notification_msg);
+
+    // Send select action to current player
+    Character* current_player = game->characters[player];
+    char* message = "\n¿Qué vas a hacer?:\n1) Luchar\n2) Rendirse\n";
+
+    // Send message to user
+    server_send_message(game->players[player], get_pkg_id(TURN), message);
+}
+
+
+// Send skill selection message
+void send_select_skill_message(Game* game, int player) {
 
     // Send select skill to current player
     Character* current_player = game->characters[player];
@@ -643,7 +667,7 @@ void monster_turn(Game* game) {
     char* raw_notification[5];
     char* raw_notification_header = "\nEl monstruo usó la habilidad -";
     raw_notification[0] = raw_notification_header;
-    raw_notification[1] = game->monster->ability_names[selected_ability_id];
+    raw_notification[1] = get_ability_name(game->monster->abilities[game->monster->selected_skill_id]);
     char* raw_not_text_2 = "- sobre ";
     raw_notification[2] = raw_not_text_2;
     raw_notification[3] = game->usernames[defender_player_id];
