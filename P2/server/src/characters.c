@@ -1,5 +1,49 @@
 #include "characters.h"
 
+// Gest ability name
+char* get_ability_name(Ability ability) {
+
+    char* name;
+    switch (ability) {
+        case ESTOCADA:
+            name = "Estocada";
+            break;
+
+        case CORTE_CRUZADO:
+            name = "Corte Cruzado";
+            break;
+
+        case DISTRAER:
+            name = "Distraer";
+            break;
+
+        case CURAR:
+            name = "Curar";
+            break;
+
+        case DESTELLO_REGENERADOR:
+            name = "Destello Regenerador";
+            break;
+
+        case DESCARGA_VITAL:
+            name = "Descarga Vital";
+            break;
+
+        case INYECCION_SQL:
+            name = "Inyección SQL";
+            break;
+
+        case ATAQUE_DDOS:
+            name = "Ataque DDOS";
+            break;
+
+        case FUERZA_BRUTA:
+            name = "Fuerza Bruta";
+            break;
+    }
+    return name;
+}
+
 
 // Create new character
 Character* create_character(Class type) {
@@ -25,14 +69,11 @@ Character* create_character(Class type) {
             character->class_name = "CAZADOR";
             character->probabilities = malloc(sizeof(double) * 1);
 
+            character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = ESTOCADA;
             character->abilities[1] = CORTE_CRUZADO;
             character->abilities[2] = DISTRAER;
-
-            character->ability_names[0] = "Estocada";
-            character->ability_names[1] = "Corte Cruzado";
-            character->ability_names[2] = "Distraer";
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
@@ -46,14 +87,11 @@ Character* create_character(Class type) {
             character->class_name = "MÉDICO";
             character->probabilities = malloc(sizeof(double) * 1);
 
+            character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = CURAR;
             character->abilities[1] = DESTELLO_REGENERADOR;
             character->abilities[2] = DESCARGA_VITAL;
-
-            character->ability_names[0] = "Curar";
-            character->ability_names[1] = "Destello Regenerador";
-            character->ability_names[2] = "Descarga Vital";
             character->enemy_target[0] = 0;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
@@ -67,14 +105,11 @@ Character* create_character(Class type) {
             character->class_name = "HACKER";
             character->probabilities = malloc(sizeof(double) * 1);
 
+            character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = INYECCION_SQL;
             character->abilities[1] = ATAQUE_DDOS;
             character->abilities[2] = FUERZA_BRUTA;
-
-            character->ability_names[0] = "Inyección SQL";
-            character->ability_names[1] = "Ataque DDOS";
-            character->ability_names[2] = "Fuerza Bruta";
             character->enemy_target[0] = 0;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
@@ -90,12 +125,10 @@ Character* create_character(Class type) {
             character->probabilities[0] = 0.5;
             character->probabilities[1] = 0.5;
 
+            character->n_abilities = 2;
             character->abilities = malloc(sizeof(Ability) * 2);
             character->abilities[0] = RUZGAR;
             character->abilities[1] = COLETAZO;
-
-            character->ability_names[0] = "Ruzalos";
-            character->ability_names[1] = "Coletazo";
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
 
@@ -110,12 +143,10 @@ Character* create_character(Class type) {
             character->probabilities[0] = 0.4;
             character->probabilities[1] = 0.6;
 
+            character->n_abilities = 2;
             character->abilities = malloc(sizeof(Ability) * 2);
             character->abilities[0] = SALTO;
             character->abilities[1] = ESPINA_VENENOSA;
-
-            character->ability_names[0] = "Salto";
-            character->ability_names[1] = "Espina Venenosa";
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
 
@@ -131,16 +162,14 @@ Character* create_character(Class type) {
             character->probabilities[1] = 0.2;
             character->probabilities[2] = 0.4;
 
+            character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = CASO_COPIA;
             character->abilities[1] = REPROBATRON_9000;
             character->abilities[2] = SUDO_RM_RF;
-
-            character->ability_names[0] = "Caso Copia";
-            character->ability_names[1] = "Reprobatron 9000";
-            character->ability_names[2] = "sudo -rm -rf";
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
+            character->enemy_target[2] = 1;
 
             character->is_monster = true;
             character->max_hp = 25000;

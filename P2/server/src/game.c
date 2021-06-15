@@ -545,39 +545,47 @@ void select_objective(int client, int player, Game* game) {
 void send_select_skill_message(Game* game, int player) {
 
     // Notify all users except the current player
-    char* raw_msg[3];
-    char* raw_text_0 = "\n";
-    raw_msg[0] = raw_text_0;
-    raw_msg[1] = game->usernames[player];
-    char* raw_text_1 = " está realizando su turno...\n";
-    raw_msg[2] = raw_text_1;
-    char* notification_msg = concatenate(raw_msg, 3);
+    char* raw_notification_msg[2];
+    raw_notification_msg[0] = game->usernames[player];
+    char* raw_not_text = " está realizando su turno...\n";
+    raw_notification_msg[1] = raw_not_text;
+    char* notification_msg = concatenate(raw_notification_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
     free(notification_msg);
 
     // Send select skill to current player
-    char* raw_select_msg[1 + game->characters[player]->n_abilities];
+    Character* current_player = game->characters[player];
+    char* raw_select_msg[1 + current_player->n_abilities];
     char* raw_select_header = "\nElige una de las siguientes habilidades:\n";
     raw_select_msg[0] = raw_select_header;
-    for (int a = 0; a < game->characters[player]->n_abilities; a++) {
-        char* raw_skill_line[4];
+
+    char* player_abilities[current_player->n_abilities];
+    for (int a = 0; a < current_player->n_abilities; a++) {
+        char* raw_ability_line[4];
         char* index = itoa(a + 1);
-        strcpy(raw_skill_line[0], index);
-        char* raw_text_ability = ") ";
-        raw_skill_line[1] = raw_text_ability;
-        raw_skill_line[2] = game->characters[player]->ability_names[a];
+        raw_ability_line[0] = index;
+        char* raw_ability_text_0 = ") ";
+        raw_ability_line[1] = raw_ability_text_0;
+        raw_ability_line[2] = get_ability_name(current_player->abilities[a]);
         char* newline = "\n";
-        raw_skill_line[3] = newline;
-        char* skill_msg = concatenate(raw_skill_line, 4);
-        strcpy(raw_select_msg[1 + a], skill_msg);
-        free(skill_msg);
+        raw_ability_line[3] = newline;
+
+        // Concatenate message
+        char* ability_message = concatenate(raw_ability_line, 4);
+        player_abilities[a] = ability_message;
+        raw_select_msg[1 + a] = player_abilities[a];
         free(index);
     }
 
-    // Send selection message to user
-    char* select_message = concatenate(raw_select_msg, 1 + game->characters[player]->n_abilities);
+    // Send message to user
+    char* select_message = concatenate(raw_select_msg, 1 + current_player->n_abilities);
     server_send_message(game->players[player], get_pkg_id(SELECT_SKILL), select_message);
     free(select_message);
+
+    // Free memory from notification messages
+    for (int a = 0; a < current_player->n_abilities; a++) {
+        free(player_abilities[a]);
+    }
 }
 
 // Send objective message if needed

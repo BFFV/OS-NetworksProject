@@ -64,7 +64,6 @@ struct character {
     int n_abilities;
     Ability* abilities;
     double* probabilities;  // (Monsters) Contains the prob of each ability
-    char* ability_names[3]; // Contains the ability name @ position x
     int enemy_target[3];    // Tells if the ability in pos x attacks an enemy
     int selected_skill_id;  // The next ability to be used.
 
@@ -110,3 +109,4 @@ void destroy_character(Character* character);
 void add_buff(Character* character);
 void copy_ability(Character* attacker, int n_characters, Character** characters, int round);
 Class get_random_monster();
+char* get_ability_name(Ability ability);
