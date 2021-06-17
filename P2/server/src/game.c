@@ -82,7 +82,7 @@ void check_state(Game* game) {
 
 // Reset game
 void reset_game(Game* game) {
-    for (int p = 0; p < game->max_players; p++) {
+    for (int p = 0; p < game->num_players; p++) {
         destroy_character(game->characters[p]);
         game->characters[p] = NULL;
     }
@@ -111,8 +111,6 @@ void destroy_game(Game* game) {
 Request get_request_type(int pkg_id) {
     Request type;
     switch (pkg_id) {
-        case 0:
-            return DISCONNECT;
         case 1:
             return SET_USERNAME;
         case 2:
@@ -138,8 +136,6 @@ Request get_request_type(int pkg_id) {
 // Map request type to pkg_id
 int get_pkg_id(Request request_type) {
     switch (request_type) {
-        case DISCONNECT:
-            return 0;
         case SET_USERNAME:
             return 1;
         case SELECT_CLASS:
@@ -279,10 +275,6 @@ void process_request(Request req_type, int client, int player, Game* game) {
 
     switch (req_type) {
 
-        case DISCONNECT:
-            disconnect(client, player, game);
-            break;
-
         case SET_USERNAME:
             set_username(client, player, game);
             break;
@@ -312,7 +304,7 @@ void process_request(Request req_type, int client, int player, Game* game) {
             break;
 
         case CONTINUE:
-            // TODO: Continue
+            return_to_lobby(client, player, game);
             break;
 
         default:
@@ -323,16 +315,15 @@ void process_request(Request req_type, int client, int player, Game* game) {
 
 // ----------- Handlers ----------- //
 
-// Disconnect player
-void disconnect(int client, int player, Game* game) {
-    close(client);
-    game->players[player] = 0;
-    game->num_players--;
-}
-
 // Set username
 void set_username(int client, int player, Game* game) {
     char* username = server_receive_payload(client);
+    if (username == NULL) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SET_USERNAME), invalid);
+        return;
+    }
+
     game->usernames[player] = calloc(sizeof(char), strlen(username) + 1);
     strcpy(game->usernames[player], username);
     free(username);
@@ -344,7 +335,14 @@ void set_username(int client, int player, Game* game) {
 
 // Select class
 void select_class(int client, int player, Game* game) {
-    int class_id = atoi(server_receive_payload(client));
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SELECT_CLASS), invalid);
+        return;
+    }
+
+    int class_id = atoi(data);
     Character* new_character;
     char* selected;
     char* invalid;
@@ -367,7 +365,7 @@ void select_class(int client, int player, Game* game) {
         default:
             invalid = "\nDebes ingresar algo válido!\n";
             server_send_message(client, get_pkg_id(SELECT_CLASS), invalid);
-            break;
+            return;
     }
     game->characters[player] = new_character;
     char* ready = " está listo para jugar como ";
@@ -416,9 +414,15 @@ void start_game(int client, int player, Game* game) {
 
 // Select the monster to play against
 void select_monster(int client, int player, Game* game) {
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SELECT_MONSTER), invalid);
+        return;
+    }
 
     // Chosen monster
-    int monster_id = atoi(server_receive_payload(client));
+    int monster_id = atoi(data);
     Character* monster;
     char* monster_name;
     char* invalid;
@@ -445,7 +449,7 @@ void select_monster(int client, int player, Game* game) {
         default:
             invalid  = "\nDebes ingresar algo válido!\n";
             server_send_message(client, get_pkg_id(SELECT_MONSTER), invalid);
-            break;
+            return;
     }
     // Set game monsters
     game->monster = monster;
@@ -548,7 +552,14 @@ void start_turn(int client, int player, Game* game) {
 
 // Select action
 void select_action(int client, int player, Game* game) {
-    int action_id = atoi(server_receive_payload(client));
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SELECT_ACTION), invalid);
+        return;
+    }
+
+    int action_id = atoi(data);
 
     // Keep fighting
     if (action_id == 1) {
@@ -570,20 +581,27 @@ void select_action(int client, int player, Game* game) {
 
 // Select skill
 void select_skill(int client, int player, Game* game) {
-
-    // Set selected skill
-    int skill_id = atoi(server_receive_payload(client));
-    if (!skill_id || skill_id > game->characters[player]->n_abilities) {
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
         char* invalid = "\nDebes ingresar algo válido!\n";
         server_send_message(client, get_pkg_id(SELECT_SKILL), invalid);
         return;
     }
 
-    Ability selected = get_ability(game->characters[player], skill_id - 1);
-    game->characters[player]->selected_skill_id = skill_id - 1;
+    // Set selected skill
+    int skill_id = atoi(data);
+    if (skill_id < 1 || skill_id > game->characters[player]->n_abilities) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SELECT_SKILL), invalid);
+        return;
+    }
+    skill_id--;
+
+    Ability selected = get_ability(game->characters[player], skill_id);
+    game->characters[player]->selected_skill_id = skill_id;
 
     // Ability targets an enemy
-    if (game->characters[player]->enemy_target[skill_id - 1]) {
+    if (game->characters[player]->enemy_target[skill_id]) {
         // TODO: Notify action
         Character** active_characters = get_active_characters(game);
         use_ability(game->characters[player], game->monster, selected, game->active_players, active_characters, game->rounds);
@@ -598,16 +616,23 @@ void select_skill(int client, int player, Game* game) {
 
 // Select objective
 void select_objective(int client, int player, Game* game) {
-
-    // Get attacker and selected id
-    Character* player_character = game->characters[player];
-    Ability selected_skill = player_character->abilities[player_character->selected_skill_id];
-    int objective_id = atoi(server_receive_payload(client)) - 1;
-    if (!objective_id || (objective_id > game->active_players - 1)) {
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
         char* invalid = "\nDebes ingresar algo válido!\n";
         server_send_message(client, get_pkg_id(SELECT_OBJECTIVE), invalid);
         return;
     }
+
+    // Get attacker and selected id
+    Character* player_character = game->characters[player];
+    Ability selected_skill = player_character->abilities[player_character->selected_skill_id];
+    int objective_id = atoi(data);
+    if (objective_id < 1 || objective_id > game->active_players) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(SELECT_OBJECTIVE), invalid);
+        return;
+    }
+    objective_id--;
     Character* defender = game->characters[objective_id];
 
     // TODO: retornar un mensaje con lo que hizo la habilidad
@@ -637,9 +662,16 @@ void select_objective(int client, int player, Game* game) {
     check_state(game);
 }
 
-// Continue playing or exit server
+// Continue playing or exit server // TODO: check errors
 void return_to_lobby(int client, int player, Game* game) {
-    int option_id = atoi(server_receive_payload(client));
+    char* data = server_receive_payload(client);
+    if (data == NULL) {
+        char* invalid = "\nDebes ingresar algo válido!\n";
+        server_send_message(client, get_pkg_id(CONTINUE), invalid);
+        return;
+    }
+
+    int option_id = atoi(data);
 
     // Keep playing
     if (option_id == 1) {
@@ -658,6 +690,7 @@ void return_to_lobby(int client, int player, Game* game) {
         game->players[player] = 0;
         free(game->usernames[player]);
         game->num_players--;
+        close(client);
 
         // Shutdown server
         if (!game->num_players) {
@@ -670,7 +703,7 @@ void return_to_lobby(int client, int player, Game* game) {
             game->usernames[0] = game->usernames[player];
             game->usernames[player] = NULL;
             char* leader = "\nAhora eres el líder del equipo!\n";
-            server_send_message(client, get_pkg_id(MESSAGE), leader);
+            server_send_message(game->players[0], get_pkg_id(MESSAGE), leader);
         }
 
         // Restart lobby
@@ -684,7 +717,7 @@ void return_to_lobby(int client, int player, Game* game) {
     server_send_message(client, get_pkg_id(CONTINUE), invalid);
 }
 
-// Restart lobby
+// Restart lobby // TODO: check errors
 void remake_lobby(Game* game) {
     game->monster = malloc(sizeof(Character*));
     game->active_players = game->num_players;

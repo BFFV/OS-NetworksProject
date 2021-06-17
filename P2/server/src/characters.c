@@ -271,6 +271,15 @@ double get_character_multiplier(Character* character) {
     return multiplier;
 };
 
+// Get ceil
+int div_ceil(int a, int b) {
+    int result = a / b;
+    if (result * b < a) {
+        result++;
+    }
+    return result;
+}
+
 // Use character ability
 void use_ability(Character* attacker, Character* defender, Ability ability, int n_characters, Character** characters, int round) {
     int damage, hp_diff;
@@ -304,13 +313,13 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
             break;
 
         case DESTELLO_REGENERADOR:
-            damage = (750 + (rand() % 1250)) * get_character_multiplier(attacker);
-            lose_hp(defender, (int) damage);
+            damage = (int) ((750 + rand() % 1250) * get_character_multiplier(attacker));
+            lose_hp(defender, damage);
 
             if (attacker->is_monster) { // If the attacker was a monster
-                recover_hp(attacker, (int) ceil(damage / 2));
+                recover_hp(attacker, div_ceil(damage, 2));
             } else { // Select a random character to heal
-                recover_hp(characters[rand() % n_characters], (int) ceil(damage / 2));
+                recover_hp(characters[rand() % n_characters], div_ceil(damage, 2));
             }
             break;
 

@@ -1,6 +1,5 @@
 #include "communication.h"
 
-
 // Receive ID from message
 int server_receive_id(int client_socket) {
     int id = 0;
@@ -30,7 +29,10 @@ void server_send_message(int client_socket, int pkg_id, char* message) {
 
     // Build packages
     int sent = 0;
-    int n_packages = ceil(payloadSize / 255);
+    int n_packages = payloadSize / 255;
+    if (n_packages * 255 < payloadSize) {
+        n_packages++;
+    }
     for (int p = 0; p < n_packages; p++) {
         int to_send = payloadSize - sent;
         if (to_send > 255) {

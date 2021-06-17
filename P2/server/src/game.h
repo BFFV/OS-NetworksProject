@@ -23,7 +23,6 @@ typedef struct game {
 
 // Request types
 typedef enum request_types {
-    DISCONNECT,
     SET_USERNAME,
     SELECT_CLASS,
     START_GAME,
@@ -85,9 +84,6 @@ Character** get_active_characters(Game* game);
 void reorder_players(Game* game);
 
 // ----------- Handlers ----------- //
-
-// Disconnect player
-void disconnect(int client, int player, Game* game);
 
 // Set username
 void set_username(int client, int player, Game* game);

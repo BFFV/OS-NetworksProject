@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <math.h>
 #pragma once
 
 
@@ -110,3 +109,4 @@ void add_buff(Character* character);
 void copy_ability(Character* attacker, int n_characters, Character** characters, int round);
 Class get_random_monster();
 char* get_ability_name(Ability ability);
+int div_ceil(int a, int b);
