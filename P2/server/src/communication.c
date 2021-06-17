@@ -28,14 +28,26 @@ void server_send_message(int client_socket, int pkg_id, char* message) {
     }
     int payloadSize = length;
 
-    // Build package
-    char msg[1 + 1 + payloadSize];
-    msg[0] = pkg_id;
-    msg[1] = payloadSize;
-    memcpy(&msg[2], message, payloadSize);
+    // Build packages
+    int sent = 0;
+    int n_packages = ceil(payloadSize / 255);
+    for (int p = 0; p < n_packages; p++) {
+        int to_send = payloadSize - sent;
+        if (to_send > 255) {
+            to_send = 255;
+        }
+        char msg[1 + 1 + to_send];
+        msg[0] = 9;  // Messages for fragments
+        if (p == n_packages - 1) {
+            msg[0] = pkg_id;
+        }
+        msg[1] = to_send;
+        memcpy(&msg[2], message + sent, to_send);
 
-    // Send package
-    send(client_socket, msg, 2 + payloadSize, 0);
+        // Send package
+        send(client_socket, msg, 2 + to_send, 0);
+        sent += to_send;
+    }
 }
 
 // Send message to all connected users

@@ -18,6 +18,7 @@ typedef struct game {
     Character* monster;  // Game monster
     int rounds;  // Round counter
     bool playing;  // Lobby/Game
+    int active_players;  // Active players
 } Game;
 
 // Request types
@@ -42,6 +43,9 @@ Game* init_game(int max_players);
 
 // Check game state
 void check_state(Game* game);
+
+// Reset game
+void reset_game(Game* game);
 
 // Destroy game
 void destroy_game(Game* game);
@@ -72,6 +76,14 @@ void send_select_objective_message(Game* game, int player);
 
 void monster_turn(Game* game);
 
+int get_next_player(Game* game, int index);
+
+int get_active_player(Game* game, int random);
+
+Character** get_active_characters(Game* game);
+
+void reorder_players(Game* game);
+
 // ----------- Handlers ----------- //
 
 // Disconnect player
@@ -100,3 +112,9 @@ void select_skill(int client, int player, Game* game);
 
 // Select objective
 void select_objective(int client, int player, Game* game);
+
+// Continue playing or exit server
+void return_to_lobby(int client, int player, Game* game);
+
+// Restart lobby
+void remake_lobby(Game* game);

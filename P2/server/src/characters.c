@@ -212,8 +212,8 @@ void lose_hp(Character* character, int hp) {
     if (character->failed) {
         hp = (int) (1.5 * (float) hp);
     }
-    character->current_hp -= (int) hp;
-    if (character->current_hp < 0) {
+    character->current_hp -= hp;
+    if (character->current_hp <= 0) {
         character->current_hp = 0;
         character->is_active = false;
     }
@@ -227,8 +227,8 @@ void recover_hp(Character* character, int hp) {
     }
 }
 
-int get_random_character_id(int n_characters) {
-    return  (int) (rand() % n_characters);
+int get_random_character_id(int active_players) {
+    return (int)(rand() % active_players);
 }
 
 int get_random_ability_id(Character* monster) {
@@ -381,7 +381,9 @@ void use_ability(Character* attacker, Character* defender, Ability ability, int 
     }
 }
 
-void apply_status_effects(Character** characters, int n_characters) {
+int apply_status_effects(Character** characters, int n_characters) {
+    // Update active players
+    int death_count = 0;
 
     for (int c = 0; c < n_characters; c++) {
         // Update buff counters
@@ -397,7 +399,7 @@ void apply_status_effects(Character** characters, int n_characters) {
             this_buff = this_buff->next_buff;
         }
 
-        // Intoxicated decrease counter
+        // Intoxicated
         if (characters[c]->intoxicated_counter > 0) {
             characters[c]->intoxicated_counter--;
             lose_hp(characters[c], 400);
@@ -405,7 +407,13 @@ void apply_status_effects(Character** characters, int n_characters) {
 
         // Bleeding loss hp
         lose_hp(characters[c], 500 * characters[c]->bleeding_counter);
+
+        if (!characters[c]->is_active) {
+            death_count++;
+        }
     }
+
+    return death_count;
 }
 
 // Destroy character

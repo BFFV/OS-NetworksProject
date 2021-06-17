@@ -93,14 +93,14 @@ void lose_hp(Character* character, int hp);
 void recover_hp(Character* character, int hp);
 
 // Monster abilities and target selection
-int get_random_character_id(int n_characters);
+int get_random_character_id(int active_players);
 int get_random_ability_id(Character* monster);
 
 // Character interactions
 Ability get_ability(Character* character, int ability_id);
 void use_ability(Character* attacker, Character* defender, Ability ability, int n_characters, Character** characters, int round);
 double get_character_multiplier(Character* character);
-void apply_status_effects(Character** characters, int n_characters);
+int apply_status_effects(Character** characters, int n_characters);
 
 // Destroy methods
 void destroy_character(Character* character);
