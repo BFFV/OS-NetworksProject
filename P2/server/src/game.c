@@ -367,7 +367,12 @@ void select_class(int client, int player, Game* game) {
             server_send_message(client, get_pkg_id(SELECT_CLASS), invalid);
             return;
     }
+
+    // Set player's new character
+    new_character->name = game->usernames[player];
     game->characters[player] = new_character;
+
+    // Notife action
     char* ready = " está listo para jugar como ";
     char* msg_notify[5];
     msg_notify[0] = "\n";
@@ -447,19 +452,21 @@ void select_monster(int client, int player, Game* game) {
             break;
 
         default:
-            invalid  = "\nDebes ingresar algo válido!\n";
+            invalid = "\nDebes ingresar algo válido!\n";
             server_send_message(client, get_pkg_id(SELECT_MONSTER), invalid);
             return;
     }
+
     // Set game monsters
     game->monster = monster;
+    game->monster->name = monster_name;
 
     // Notify all game users that the game has started
     char* raw_text_0 = "\nEl juego ha comenzado! Pelearán contra el temible monstruo: ";
     char* raw_text_1 = "\n";
     char* raw_msg[3];
     raw_msg[0] = raw_text_0;
-    raw_msg[1] = game->monster->class_name;
+    raw_msg[1] = game->monster->name;
     raw_msg[2] = raw_text_1;
     char* start_msg = concatenate(raw_msg, 3);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), start_msg, -1);
@@ -483,7 +490,7 @@ void start_turn(int client, int player, Game* game) {
     char* players_messages[game->active_players];
     int count = 0;
     for (int p = 0; p < game->num_players; p++) {
-        if (game->characters[p]->is_active){
+        if (game->characters[p]->is_active) {
             char* player_raw_line[8];
 
             // Build character stats line
@@ -597,15 +604,17 @@ void select_skill(int client, int player, Game* game) {
     }
     skill_id--;
 
-    Ability selected = get_ability(game->characters[player], skill_id);
+    Ability selected_ability = get_ability(game->characters[player], skill_id);
     game->characters[player]->selected_skill_id = skill_id;
 
     // Ability targets an enemy
     if (game->characters[player]->enemy_target[skill_id]) {
         // TODO: Notify action
         Character** active_characters = get_active_characters(game);
-        use_ability(game->characters[player], game->monster, selected, game->active_players, active_characters, game->rounds);
+        char* notification = use_ability(player, -1, active_characters, game->active_players, game->rounds, selected_ability);
+        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
         free(active_characters);
+        free(notification);
         check_state(game);
         return;
     }
@@ -635,28 +644,10 @@ void select_objective(int client, int player, Game* game) {
     objective_id--;
     Character* defender = game->characters[objective_id];
 
-    // TODO: retornar un mensaje con lo que hizo la habilidad
     Character** active_characters = get_active_characters(game);
-    use_ability(player_character, defender, selected_skill,
-        game->active_players, active_characters, game->rounds);
-
-    // TODO: esta notificación debe ser entregada por el use_ability
-    char* raw_notification[7];
-    raw_notification[0] = "\n";
-    raw_notification[1] = game->usernames[player];
-    char* raw_not_text_1 = " usó la habilidad <";
-    raw_notification[2] = raw_not_text_1;
-    raw_notification[3] = get_ability_name(selected_skill);
-    char* raw_not_text_2 = "> en su aliado ";
-    raw_notification[4] = raw_not_text_2;
-    raw_notification[5] = game->usernames[objective_id];
-    char* newline = "!\n";
-    raw_notification[6] = newline;
-
-    // Send notification to all players
-    char* notification_msg = concatenate(raw_notification, 7);
-    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
-    free(notification_msg);
+    char* message = use_ability(player, objective_id, active_characters, game->active_players, game->rounds, selected_skill);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), message, -1);
+    free(message);
 
     // Check state of the board and pass to the next turn
     check_state(game);
@@ -844,6 +835,20 @@ void send_select_objective_message(Game* game, int player) {
 // The monster uses an ability on a random user
 void monster_turn(Game* game) {
 
+    // Get random ability
+    int selected_ability_id = get_random_ability_id(game->monster);
+    Ability selected_ability = game->monster->abilities[selected_ability_id];
+
+    int defender_player_id = get_active_player(game, get_random_character_id(game->active_players));
+    Character* defender = game->characters[defender_player_id];
+
+    // Monster attacks
+    Character** active_characters = get_active_characters(game);
+    char* notification = use_ability(-1, defender_player_id, active_characters, game->active_players, game->rounds, selected_ability);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
+    free(active_characters);
+    free(notification);
+
     // Bleeding effect
     lose_hp(game->monster, 500 * game->monster->bleeding_counter);
     if (game->monster->bleeding_counter) {
@@ -864,60 +869,11 @@ void monster_turn(Game* game) {
         reset_game(game);
         return;
     }
-
-    // Get random ability
-    int selected_ability_id = get_random_ability_id(game->monster);
-    Ability selected_ability = game->monster->abilities[selected_ability_id];
-    Character* defender = NULL;
-    int defender_player_id;
-
-    // Hunter's ability: Distraer
-    if (game->monster->next_defender) {
-        defender = game->monster->next_defender;
-        // TODO: defender player id as attribute for Character
-        defender_player_id = 0;
-        game->monster->next_defender = NULL;
-
-    } else {
-        // Get a random player
-        defender_player_id = get_active_player(game, get_random_character_id(game->active_players));
-        defender = game->characters[defender_player_id];
-    }
-
-    // Monster attacks
-    Character** active_characters = get_active_characters(game);
-    use_ability(game->monster, defender, selected_ability, game->active_players, active_characters, game->rounds);
-    free(active_characters);
-
-    // Player dies
-    if (!defender->is_monster && !defender->is_active) {
-        game->active_players--;
-    }
-
-    // TODO: Esta notificación debería retornarse en el use_ability
-    // Notifies users of the monster attack
-    char* raw_notification[7];
-    raw_notification[0] = "\nMONSTRUO: ";
-    raw_notification[1] = game->monster->class_name;
-    raw_notification[2] = " usó la habilidad <";
-    raw_notification[3] = get_ability_name(selected_ability);
-    char* raw_not_text_2 = "> sobre ";
-    raw_notification[4] = raw_not_text_2;
-    if (selected_ability == COLETAZO || selected_ability == SUDO_RM_RF) {
-        raw_notification[5] = "todos";
-    } else {
-        raw_notification[5] = game->usernames[defender_player_id];
-    }
-    char* newline = "!\n";
-    raw_notification[6] = newline;
-    char* notification_msg = concatenate(raw_notification, 7);
-    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, -1);
-    free(notification_msg);
 }
 
 // Gets the next active player
 int get_next_player(Game* game, int index) {
-    for (int i = index + 1; i < game->num_players; i++){
+    for (int i = index + 1; i < game->num_players; i++) {
         if (game->characters[i]->is_active) {
             return i;
         }
@@ -926,7 +882,7 @@ int get_next_player(Game* game, int index) {
 }
 
 // Get active player by index
-int get_active_player(Game* game, int random){
+int get_active_player(Game* game, int random) {
     int count = 0;
     for (int i = 0; i < game->num_players; i++) {
         if (game->characters[i]->is_active) {
@@ -940,8 +896,8 @@ int get_active_player(Game* game, int random){
 }
 
 // Get active characters
-Character** get_active_characters(Game* game){
-    Character** active_characters = calloc(game->active_players, sizeof(Character*));
+Character** get_active_characters(Game* game) {
+    Character** active_characters = calloc(game->active_players + 1, sizeof(Character*));
     int count = 0;
     for (int i = 0; i < game->num_players; i++) {
         if (game->characters[i]->is_active) {
@@ -949,6 +905,7 @@ Character** get_active_characters(Game* game){
             count++;
         }
     }
+    active_characters[game->active_players] = game->monster;
     return active_characters;
 }
 

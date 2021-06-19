@@ -14,15 +14,25 @@ char* concatenate(char** str_array, int size) {
 
     // Calculate final string size
     int total_length = 0;
-    for (int s = 0; s < size; s++){
+    for (int s = 0; s < size; s++) {
         total_length += strlen(str_array[s]);
     }
 
     // Generate new string
     char* new_string = calloc(total_length + 1, sizeof(char));
-    for (int s = 0; s < size; s++){
+    for (int s = 0; s < size; s++) {
         strcat(new_string, str_array[s]);
     }
 
     return new_string;  // IMPORTANT: Remember to free memory from this pointer
 }
+
+// Get ceil
+int div_ceil(int a, int b) {
+    int result = a / b;
+    if (result * b < a) {
+        result++;
+    }
+    return result;
+}
+

@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "utils.h"
 #pragma once
 
 
@@ -58,6 +59,7 @@ struct character {
     // Define class name and type
     char* class_name;   // Class name or monster name
     Class type;         // Class enum
+    char* name;
 
     // Character abilities
     int n_abilities;
@@ -73,40 +75,87 @@ struct character {
     // Buff and Debuff
     Buff* buffs;
     int n_buffs;
-    bool failed;
+    int failed_counter;
 
     // Special Class: Hacker (deals 10k of damage after counter = 3)
     int brute_force_counter;
 
     // Monster attribute: next_attack, when hunter distract the monster
-    Character* next_defender;
+    int next_defender_id;
 
     // Special Class: Ruzalos (cannot jump two consecutive rounds)
     bool jumped;
 
 };
 
+// -------- Main Functions ---------
+
 // Character basic methods
 Character* create_character(Class type);
+
+// Destroy methods
+void destroy_character(Character* character);
+
+// Deals damage to character
 void lose_hp(Character* character, int hp);
+
+// Heal character
 void recover_hp(Character* character, int hp);
+
+// Use a selected ability
+char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, int rounds, Ability ability);
+
+// Apply/Updates long term effects
+int apply_status_effects(Character** characters, int n_characters);
+
+
+// ---------- Helpers -------------------
 
 // Monster abilities and target selection
 int get_random_character_id(int active_players);
 int get_random_ability_id(Character* monster);
 
-// Character interactions
-Ability get_ability(Character* character, int ability_id);
-void use_ability(Character* attacker, Character* defender, Ability ability, int n_characters, Character** characters, int round);
-double get_character_multiplier(Character* character);
-int apply_status_effects(Character** characters, int n_characters);
-
-// Destroy methods
-void destroy_character(Character* character);
-
-// Aux methods
-void add_buff(Character* character);
-void copy_ability(Character* attacker, int n_characters, Character** characters, int round);
+// Select a random monster to fight
 Class get_random_monster();
+
+// Abilities interactions
+Ability get_ability(Character* character, int ability_id);
 char* get_ability_name(Ability ability);
-int div_ceil(int a, int b);
+
+// Calculates the damage modifier on character
+double get_character_multiplier(Character* character);
+
+// -------------- Attack Functions ---------------
+
+char* estocada(Character* attacker, Character* defender);
+
+char* corte_cruzado(Character* attacker, Character* defender);
+
+char* distraer(Character* attacker, Character* defender, int attacker_id);
+
+char* curar(Character* healer, Character* defender);
+
+char* destello_regenerador(Character* attacker, Character* defender, Character** characters, int n_characters);
+
+char* descarga_vital(Character* attacker, Character* defender);
+
+char* inyeccion_sql(Character* attacker, Character* objective);
+
+char* ataque_ddos(Character* attacker, Character* defender);
+
+char* brute_force_attack(Character* attacker, Character* defender);
+
+char* ruzgar(Character* attacker, Character* defender);
+
+char* coletazo(Character* attacker, Character** characters, int n_characters);
+
+char* salto(Character* attacker, Character* defender);
+
+char* espina_venenosa(Character* attacker, Character* defender);
+
+// TODO: Healing only for the monster, show chosen abilities
+char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds);
+
+char* reprobaton_9000(Character* attacker, Character* defender);
+
+char* sudo_rm_rf(Character* attacker, Character** characters, int n_characters, int rounds);

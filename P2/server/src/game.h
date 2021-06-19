@@ -1,6 +1,5 @@
 #include "connection.h"
 #include "communication.h"
-#include "utils.h"
 #include "characters.h"
 #pragma once
 
