@@ -36,3 +36,13 @@ int div_ceil(int a, int b) {
     return result;
 }
 
+
+int int_min(int a, int b) {
+    int min;
+    if (a <= b) {
+        min = a;
+    } else {
+        min = b;
+    }
+    return min;
+}

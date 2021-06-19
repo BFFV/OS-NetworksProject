@@ -18,5 +18,9 @@ int main(int argc, char* argv[]) {
     // Run server
     await_requests(server, game);
 
+    // Stop server
+    close(server);
+    printf("Server terminated normally\n");
+
     return 0;
 }

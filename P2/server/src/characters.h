@@ -103,7 +103,7 @@ void lose_hp(Character* character, int hp);
 void recover_hp(Character* character, int hp);
 
 // Use a selected ability
-char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, int rounds, Ability ability);
+char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, Character* monster, int rounds, Ability ability);
 
 // Apply/Updates long term effects
 int apply_status_effects(Character** characters, int n_characters);
@@ -153,7 +153,6 @@ char* salto(Character* attacker, Character* defender);
 
 char* espina_venenosa(Character* attacker, Character* defender);
 
-// TODO: Healing only for the monster, show chosen abilities
 char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds);
 
 char* reprobaton_9000(Character* attacker, Character* defender);

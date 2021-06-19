@@ -76,7 +76,10 @@ void monster_turn(Game* game);
 
 int get_next_player(Game* game, int index);
 
-int get_active_player(Game* game, int random);
+// Get active player index
+int get_active_index(Game* game, int player);
+
+int get_active_socket(Game* game, int random);
 
 Character** get_active_characters(Game* game);
 

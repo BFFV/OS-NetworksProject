@@ -14,3 +14,5 @@ char* concatenate(char** str_array, int size);
 
 // Get ceil of the division of two numbers
 int div_ceil(int a, int b);
+
+int int_min(int a, int b);

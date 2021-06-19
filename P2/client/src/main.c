@@ -27,14 +27,17 @@ int main (int argc, char *argv[]) {
     int client = prepare_socket(argv[2], atoi(argv[4]));
 
     // Run client
-    while (true) {
+    bool running = true;
+    while (running) {
         int msg_code = client_receive_id(client);
         char* message = client_receive_payload(client);
         printf("%s", message);
         free(message);
 
-        // Input required
-        if (msg_code != 9) {
+        // End connection
+        if (!msg_code) {
+            running = false;
+        } else if (msg_code != 9) {  // Input required
             char* response = get_input();
             client_send_message(client, msg_code, response);
         }

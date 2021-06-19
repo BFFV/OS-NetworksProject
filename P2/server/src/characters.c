@@ -158,12 +158,13 @@ void destroy_character(Character* character) {
 // Damage character
 void lose_hp(Character* character, int hp) {
     if (character->failed_counter) {
-        hp = (int)(1.5 * (float)hp);
+        hp = (int) (1.5 * (float) hp);
     }
     character->current_hp -= hp;
     if (character->current_hp <= 0) {
         character->current_hp = 0;
         character->is_active = false;
+        // TODO: death notification
     }
 }
 
@@ -176,7 +177,7 @@ void recover_hp(Character* character, int hp) {
 }
 
 // Use character ability
-char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, int rounds, Ability ability) {
+char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, Character* monster, int rounds, Ability ability) {
     char* message;
 
     // Get attacker and defender (Special case when the enemy is distracted)
@@ -184,7 +185,7 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
     if (attacker_id != -1) {
         attacker = characters[attacker_id];
     } else {
-        attacker = characters[n_characters];
+        attacker = monster;
     }
 
     Character* defender;
@@ -192,18 +193,17 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
         if (attacker->next_defender_id != -1) {
             defender = characters[attacker->next_defender_id];
         } else {
-            defender = characters[n_characters];
+            defender = monster;
         }
 
         // reset next defender
         attacker->next_defender_id = 999;
 
     } else if (defender_id == -1) {
-        defender = characters[n_characters];
+        defender = monster;
     } else {
         defender = characters[defender_id];
     }
-    printf("Attacker: %s || Defender: %s\n", attacker->name, defender->name);
 
     switch (ability) {
 
@@ -277,6 +277,7 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
 
 // Proc long term ability effects
 int apply_status_effects(Character** characters, int n_characters) {
+    // TODO: status notification
     // Update active players
     int death_count = 0;
 
@@ -322,7 +323,7 @@ int apply_status_effects(Character** characters, int n_characters) {
 
 // Used to select objective when the monster attacks
 int get_random_character_id(int active_players) {
-    return (int)(rand() % active_players);
+    return (int) (rand() % active_players);
 }
 
 // Get random monster to fight
@@ -461,7 +462,6 @@ char* estocada(Character* attacker, Character* defender) {
 
     // Deals damage to defender
     int damage = (int)(1000 * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
     // Apply bleeding
     if (defender->bleeding_counter < 3) {
@@ -469,15 +469,16 @@ char* estocada(Character* attacker, Character* defender) {
     }
 
     // Transform damage to string
-    char* str_damage = itoa(damage);
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Estocada> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
-    raw_message[5] = " puntos de vida!\n";
+    raw_message[5] = " puntos de vida y aplicando sangrado!\n";
     char* notification = concatenate(raw_message, 6);
     free(str_damage);
 
@@ -487,16 +488,16 @@ char* estocada(Character* attacker, Character* defender) {
 char* corte_cruzado(Character* attacker, Character* defender) {
     char* raw_message[6];
     int damage = (int)(3000 * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
     // Transform damage to string
-    char* str_damage = itoa(damage);
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Corte Cruzado> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -513,7 +514,7 @@ char* distraer(Character* attacker, Character* defender, int attacker_id) {
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Distraer> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " su próxima habilidad será redirigida!\n";
+    raw_message[3] = ", su próxima habilidad será redirigida!\n";
     char* notification = concatenate(raw_message, 4);
 
     return notification;
@@ -521,14 +522,16 @@ char* distraer(Character* attacker, Character* defender, int attacker_id) {
 
 char* curar(Character* healer, Character* defender) {
     char* raw_message[6];
-    int heal = (int)(2000 * get_character_multiplier(healer));
+    int heal = (int) (2000 * get_character_multiplier(healer));
     if (healer->is_monster) {
         defender = healer;
     }
-    recover_hp(defender, heal);
 
     // Transform heal to string
-    char* str_heal = itoa(heal);
+    char* str_heal = itoa(int_min(heal, defender->max_hp - defender->current_hp));
+
+    // Healing
+    recover_hp(defender, heal);
 
     // Write message
     raw_message[0] = healer->name;
@@ -550,18 +553,20 @@ char* destello_regenerador(Character* attacker, Character* defender, Character**
     int damage = (int)((750 + rand() % 1250) * get_character_multiplier(attacker));
     int heal = div_ceil(damage, 2);
 
-    lose_hp(defender, damage);
     Character* objective;
     if (attacker->is_monster) {
         objective = attacker;
     } else { // Select a random character to heal
         objective = characters[rand() % n_characters];
     }
-    recover_hp(objective, heal);
 
     // Transform damage and heal to string
-    char* str_damage = itoa(damage);
-    char* str_heal = itoa(heal);
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    char* str_heal = itoa(int_min(heal, objective->max_hp - objective->current_hp));
+
+    // Damage & heal
+    lose_hp(defender, damage);
+    recover_hp(objective, heal);
 
     // Write message
     raw_message[0] = attacker->name;
@@ -586,16 +591,16 @@ char* descarga_vital(Character* attacker, Character* defender) {
     char* raw_message[6];
     int hp_diff = (attacker->max_hp) - (attacker->current_hp);
     int damage = (int)(2 * hp_diff * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
-    // Transform damage to string
-    char* str_damage = itoa(damage);
+    // Gets total damage
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <Descarga Vital> y libreró todo su daño sobre ";
+    raw_message[1] = " usó <Descarga Vital> y liberó todo su daño sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = " quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -632,9 +637,9 @@ char* inyeccion_sql(Character* attacker, Character* objective) {
 
     // Write message
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <Inyección SQL> y sobrecargo a ";
+    raw_message[1] = " usó <Inyección SQL> y sobrecargó a ";
     raw_message[2] = objective->name;
-    raw_message[3] = " duplicando su daño total!\n";
+    raw_message[3] = ", duplicando su ataque por 2 turnos!\n";
     char* notification = concatenate(raw_message, 4);
 
     return notification;
@@ -643,16 +648,16 @@ char* inyeccion_sql(Character* attacker, Character* objective) {
 char* ataque_ddos(Character* attacker, Character* defender) {
     char* raw_message[6];
     int damage = (int)(1500 * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
-    // Transform damage to string
-    char* str_damage = itoa(damage);
+    // Gets total damage
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Ataque DDOS> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = " quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -668,15 +673,15 @@ char* brute_force_attack(Character* attacker, Character* defender) {
     attacker->brute_force_counter++;
     if (attacker->brute_force_counter == 3) {
         int damage = (int)(10000 * get_character_multiplier(attacker));
-        lose_hp(defender, damage);
         attacker->brute_force_counter = 0;
 
         // Damage to string
-        char* str_damage = itoa(damage);
+        char* str_damage = itoa(int_min(damage, defender->current_hp));
+        lose_hp(defender, damage);
 
         // Write message
         raw_message[0] = attacker->name;
-        raw_message[1] = " logró hacer un <Brute Force Attack> sobre ";
+        raw_message[1] = " logró usar <Fuerza Bruta> sobre ";
         raw_message[2] = defender->name;
         raw_message[3] = " quitándole ";
         raw_message[4] = str_damage;
@@ -691,9 +696,9 @@ char* brute_force_attack(Character* attacker, Character* defender) {
 
         // Write message
         raw_message[0] = attacker->name;
-        raw_message[1] = " intentó hacer un Brute Force Attack sobre ";
+        raw_message[1] = " intentó usar <Fuerza Bruta> sobre ";
         raw_message[2] = defender->name;
-        raw_message[3] = " y acumuló un nuevo intento (Contador:";
+        raw_message[3] = " y acumuló un nuevo intento (Contador: ";
         raw_message[4] = counter;
         raw_message[5] = ")!\n";
         notification = concatenate(raw_message, 6);
@@ -705,16 +710,16 @@ char* brute_force_attack(Character* attacker, Character* defender) {
 char* ruzgar(Character* attacker, Character* defender) {
     char* raw_message[6];
     int damage = (int)(1000 * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
-    // Transform damage to string
-    char* str_damage = itoa(damage);
+    // Get total damage
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Ruzgar> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = " quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -735,7 +740,7 @@ char* coletazo(Character* attacker, Character** characters, int n_characters) {
 
     // Write message
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <COLETAZO> restando ";
+    raw_message[1] = " usó <COLETAZO>, restando ";
     raw_message[2] = str_damage;
     raw_message[3] = " puntos de vida a todos los jugadores!\n";
     char* notification = concatenate(raw_message, 4);
@@ -747,19 +752,19 @@ char* coletazo(Character* attacker, Character** characters, int n_characters) {
 char* salto(Character* attacker, Character* defender) {
     char* raw_message[6];
     int damage = (int)(1500 * get_character_multiplier(attacker));
-    lose_hp(defender, damage);
 
     // Block jump for the next turn
     attacker->jumped = true;
 
-    // Transform damage to string
-    char* str_damage = itoa(damage);
+    // Get total damage
+    char* str_damage = itoa(int_min(damage, defender->current_hp));
+    lose_hp(defender, damage);
 
     // Write message
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Salto> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " restándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -774,17 +779,17 @@ char* espina_venenosa(Character* attacker, Character* defender) {
     // Check if target already intoxicated
     if (defender->intoxicated_counter > 0) {
         int damage = (int)(500 * get_character_multiplier(attacker));
-        lose_hp(defender, damage);
 
-        // Transform damage to string
-        char* str_damage = itoa(damage);
+        // Get total damage
+        char* str_damage = itoa(int_min(damage, defender->current_hp));
+        lose_hp(defender, damage);
 
         // Write message
         char* raw_message[6];
         raw_message[0] = attacker->name;
         raw_message[1] = " usó <Espina Venenosa> sobre ";
         raw_message[2] = defender->name;
-        raw_message[3] = " restándole ";
+        raw_message[3] = ", quitándole ";
         raw_message[4] = str_damage;
         raw_message[5] = " puntos de vida!\n";
         notification = concatenate(raw_message, 6);
@@ -798,7 +803,7 @@ char* espina_venenosa(Character* attacker, Character* defender) {
         raw_message[0] = attacker->name;
         raw_message[1] = " usó <Espina Venenosa> sobre ";
         raw_message[2] = defender->name;
-        raw_message[3] = " y lo intoxicó por los próximos 3 turnos \n";
+        raw_message[3] = " y lo intoxicó por los próximos 3 turnos!\n";
         notification = concatenate(raw_message, 4);
 
     }
@@ -806,7 +811,6 @@ char* espina_venenosa(Character* attacker, Character* defender) {
     return notification;
 }
 
-// TODO: Healing only for the monster, show chosen abilities
 char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds) {
     char* notification_message[2];
 
@@ -821,15 +825,15 @@ char* caso_copia(Character* attacker, Character** characters, int n_characters, 
 
     char* raw_message[6];
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <Caso Copia>. Copió la habilidad ";
+    raw_message[1] = " usó <Caso Copia>. Copió la habilidad <";
     raw_message[2] = get_ability_name(ab_sel);
-    raw_message[3] = " del jugador ";
-    raw_message[4] = characters[defender_id_sel]->name;
+    raw_message[3] = "> del jugador ";
+    raw_message[4] = characters[player_abl_sel]->name;
     raw_message[5] = "!\n";
     notification_message[0] = concatenate(raw_message, 6);
 
     // Use the selected ability
-    notification_message[1] = use_ability(-1, defender_id_sel, characters, n_characters, rounds, ab_sel);
+    notification_message[1] = use_ability(-1, defender_id_sel, characters, n_characters, attacker, rounds, ab_sel);
     char* notification = concatenate(notification_message, 2);
     free(notification_message[0]);
     free(notification_message[1]);
@@ -841,10 +845,10 @@ char* reprobaton_9000(Character* attacker, Character* defender) {
     defender->failed_counter = 2;
 
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <Reprobaton 9000> contra ";
+    raw_message[1] = " usó <Reprobatón 9000> contra ";
     raw_message[2] = defender->name;
     raw_message[3] = "!\nRecibirá 50\% de daño extra y sus ataques";
-    raw_message[4] = " harán un 50\% menos de daño";
+    raw_message[4] = " harán un 50\% menos de daño!";
 
     char* message = concatenate(raw_message, 5);
     return message;
@@ -852,14 +856,19 @@ char* reprobaton_9000(Character* attacker, Character* defender) {
 
 char* sudo_rm_rf(Character* attacker, Character** characters, int n_characters, int rounds) {
     char* raw_message[6];
+
+    // Calculates damage
+    int damage = (int)(100 * rounds * get_character_multiplier(attacker));
+
     for (int ch = 0; ch < n_characters; ch++) {
-        lose_hp(characters[ch], (int)(100 * rounds * get_character_multiplier(attacker)));
+        lose_hp(characters[ch], damage);
     }
+
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <sudo rm -rf>. Todos recibirán 100 de daño por cada ronda. Se han jugado ";
     raw_message[2] = itoa(rounds);
     raw_message[3] = "!\nPor lo tanto recibirán ";
-    raw_message[4] = itoa(100 * rounds * get_character_multiplier(attacker));
+    raw_message[4] = itoa(damage);
     raw_message[5] = " de daño!\n";
     char* message = concatenate(raw_message, 6);
     free(raw_message[2]);

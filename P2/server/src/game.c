@@ -32,6 +32,8 @@ void check_state(Game* game) {
     if (!game->monster->is_active) {
         char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
         notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), end_message, -1);
+
+        // TODO: Loot
         reset_game(game);
 
     } else {
@@ -213,7 +215,7 @@ void await_requests(int server_socket, Game* game) {
             if ((game->num_players == game->max_players) || (game->playing)) {
                 int invalid_player = accept(server_socket, (struct sockaddr*)&client_addr, &addr_size);
                 char* invalid_msg = "\nNo es posible conectarse al juego actualmente!\n";
-                server_send_message(invalid_player, get_pkg_id(MESSAGE), invalid_msg);
+                server_send_message(invalid_player, 0, invalid_msg);
                 close(invalid_player);
             } else {  // Accept new player
                 new_player = accept(server_socket, (struct sockaddr*)&client_addr, &addr_size);
@@ -257,17 +259,15 @@ void await_requests(int server_socket, Game* game) {
             // Current client
             sd = game->players[p];
             if (FD_ISSET(sd, &readfds)) {
-                if ((game->playing && game->current_player == p) || (!game->playing)) {
+                // Package ID
+                int pkg_id = server_receive_id(sd);
 
-                    // Package ID
-                    int pkg_id = server_receive_id(sd);
-
-                    // Process request
-                    process_request(get_request_type(pkg_id), sd, p, game);
-                }
+                // Process request
+                process_request(get_request_type(pkg_id), sd, p, game);
             }
         }
     }
+    destroy_game(game);
 }
 
 // Process request from client
@@ -449,6 +449,19 @@ void select_monster(int client, int player, Game* game) {
 
         case 4:  // Random
             monster = create_character(get_random_monster());
+            switch (monster->type) {
+                case GREAT_JAGRUZ:
+                    monster_name = "Great JagRuz";
+                    break;
+                case RUZALOS:
+                    monster_name = "Ruzalos";
+                    break;
+                case RUIZ:
+                    monster_name = "Ruiz";
+                    break;
+                default:
+                    break;
+            }
             break;
 
         default:
@@ -576,6 +589,13 @@ void select_action(int client, int player, Game* game) {
         // Surrender
         game->characters[player]->is_active = false;
         game->active_players--;
+        char* surrender[3];
+        surrender[0] = "\n";
+        surrender[1] = game->usernames[player];
+        surrender[2] = " se ha rendido!\n";
+        char* surrender_msg = concatenate(surrender, 3);
+        notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), surrender_msg, -1);
+        free(surrender_msg);
 
         // Check game state
         check_state(game);
@@ -609,9 +629,8 @@ void select_skill(int client, int player, Game* game) {
 
     // Ability targets an enemy
     if (game->characters[player]->enemy_target[skill_id]) {
-        // TODO: Notify action
         Character** active_characters = get_active_characters(game);
-        char* notification = use_ability(player, -1, active_characters, game->active_players, game->rounds, selected_ability);
+        char* notification = use_ability(get_active_index(game, player), -1, active_characters, game->active_players, game->monster, game->rounds, selected_ability);
         notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
         free(active_characters);
         free(notification);
@@ -645,7 +664,7 @@ void select_objective(int client, int player, Game* game) {
     Character* defender = game->characters[objective_id];
 
     Character** active_characters = get_active_characters(game);
-    char* message = use_ability(player, objective_id, active_characters, game->active_players, game->rounds, selected_skill);
+    char* message = use_ability(get_active_index(game, player), objective_id, active_characters, game->active_players, game->monster, game->rounds, selected_skill);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), message, -1);
     free(message);
 
@@ -653,7 +672,7 @@ void select_objective(int client, int player, Game* game) {
     check_state(game);
 }
 
-// Continue playing or exit server // TODO: check errors
+// Continue playing or exit server
 void return_to_lobby(int client, int player, Game* game) {
     char* data = server_receive_payload(client);
     if (data == NULL) {
@@ -678,6 +697,8 @@ void return_to_lobby(int client, int player, Game* game) {
     } else if (option_id == 2) {
 
         // Exit server
+        char* goodbye = "\nHasta pronto!\n";
+        server_send_message(game->players[player], 0, goodbye);
         game->players[player] = 0;
         free(game->usernames[player]);
         game->num_players--;
@@ -685,14 +706,14 @@ void return_to_lobby(int client, int player, Game* game) {
 
         // Shutdown server
         if (!game->num_players) {
-            destroy_game(game);
             running = false;
+            return;
         } else if (!player) {  // Leader leaves
-            int new_leader = get_active_player(game, get_random_character_id(game->num_players));
+            int new_leader = get_active_socket(game, get_random_character_id(game->num_players));
+            game->usernames[0] = game->usernames[new_leader];
+            game->usernames[new_leader] = NULL;
             game->players[0] = game->players[new_leader];
             game->players[new_leader] = 0;
-            game->usernames[0] = game->usernames[player];
-            game->usernames[player] = NULL;
             char* leader = "\nAhora eres el líder del equipo!\n";
             server_send_message(game->players[0], get_pkg_id(MESSAGE), leader);
         }
@@ -708,7 +729,7 @@ void return_to_lobby(int client, int player, Game* game) {
     server_send_message(client, get_pkg_id(CONTINUE), invalid);
 }
 
-// Restart lobby // TODO: check errors
+// Restart lobby
 void remake_lobby(Game* game) {
     game->monster = malloc(sizeof(Character*));
     game->active_players = game->num_players;
@@ -732,6 +753,15 @@ void send_select_action_message(Game* game, int player) {
     char* notification_msg = concatenate(raw_notification_msg, 2);
     notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification_msg, player);
     free(notification_msg);
+
+    // Notify current player
+    char* current[3];
+    current[0] = "\n";
+    current[1] = game->usernames[player];
+    current[2] = ", es tu turno...\n";
+    char* current_msg = concatenate(current, 3);
+    server_send_message(game->players[player], get_pkg_id(MESSAGE), current_msg);
+    free(current_msg);
 
     // Send select action to current player
     Character* current_player = game->characters[player];
@@ -835,25 +865,11 @@ void send_select_objective_message(Game* game, int player) {
 // The monster uses an ability on a random user
 void monster_turn(Game* game) {
 
-    // Get random ability
-    int selected_ability_id = get_random_ability_id(game->monster);
-    Ability selected_ability = game->monster->abilities[selected_ability_id];
-
-    int defender_player_id = get_active_player(game, get_random_character_id(game->active_players));
-    Character* defender = game->characters[defender_player_id];
-
-    // Monster attacks
-    Character** active_characters = get_active_characters(game);
-    char* notification = use_ability(-1, defender_player_id, active_characters, game->active_players, game->rounds, selected_ability);
-    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
-    free(active_characters);
-    free(notification);
-
     // Bleeding effect
     lose_hp(game->monster, 500 * game->monster->bleeding_counter);
     if (game->monster->bleeding_counter) {
         char* monster_bleed[5];
-        monster_bleed[0] = "\nMONSTRUO: ";
+        monster_bleed[0] = "MONSTRUO: ";
         monster_bleed[1] = game->monster->class_name;
         monster_bleed[2] = " perdió ";
         monster_bleed[3] = itoa(500 * game->monster->bleeding_counter);
@@ -869,6 +885,24 @@ void monster_turn(Game* game) {
         reset_game(game);
         return;
     }
+
+    // Get random ability & target
+    int selected_ability_id = get_random_ability_id(game->monster);
+    Ability selected_ability = game->monster->abilities[selected_ability_id];
+    int defender_player_id = get_random_character_id(game->active_players);
+    Character** active_characters = get_active_characters(game);
+    Character* defender = active_characters[defender_player_id];
+
+    // Monster attacks
+    char* notification = use_ability(-1, defender_player_id, active_characters, game->active_players, game->monster, game->rounds, selected_ability);
+    notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), notification, -1);
+    free(active_characters);
+    free(notification);
+
+    // Player dies
+    if (!defender->is_monster && !defender->is_active) {
+        game->active_players--;
+    }
 }
 
 // Gets the next active player
@@ -881,11 +915,22 @@ int get_next_player(Game* game, int index) {
     return -1;
 }
 
-// Get active player by index
-int get_active_player(Game* game, int random) {
+// Get active player index
+int get_active_index(Game* game, int player) {
     int count = 0;
-    for (int i = 0; i < game->num_players; i++) {
+    for (int i = 0; i < player; i++) {
         if (game->characters[i]->is_active) {
+            count++;
+        }
+    }
+    return count;
+}
+
+// Get active socket by index
+int get_active_socket(Game* game, int random) {
+    int count = 0;
+    for (int i = 0; i < game->max_players; i++) {
+        if (game->players[i]) {
             if (count == random) {
                 return i;
             }
@@ -897,7 +942,7 @@ int get_active_player(Game* game, int random) {
 
 // Get active characters
 Character** get_active_characters(Game* game) {
-    Character** active_characters = calloc(game->active_players + 1, sizeof(Character*));
+    Character** active_characters = calloc(game->active_players, sizeof(Character*));
     int count = 0;
     for (int i = 0; i < game->num_players; i++) {
         if (game->characters[i]->is_active) {
@@ -905,7 +950,6 @@ Character** get_active_characters(Game* game) {
             count++;
         }
     }
-    active_characters[game->active_players] = game->monster;
     return active_characters;
 }
 
