@@ -18,7 +18,7 @@
 
 ## Modo de Uso
 
-* El servidor se debe compilar utilizando el `makefile` incluído, asegurándose de tener la carpeta `loot` en ese mismo directorio (`server`) para que funcione el bonus correctamente **(ver foto)**.
+* El servidor se debe compilar utilizando el `makefile` incluído, asegurándose de tener la carpeta `loot` en ese mismo directorio (`server`) para que funcione el bonus correctamente.
 * Los clientes se deben compilar utilizando el `makefile` incluído, asegurándose de que estén separados entre sí (en vez de correr el mismo binario múltiples veces), para que de esta forma tengan sus carpetas de `loot_conseguido` separadas y se eviten colisiones de estas imágenes para distintos clientes.
 * El servidor se corre con el comando `./server -i 0.0.0.0 -p 8080`, mientras que cada cliente se corre con `./client -i 0.0.0.0 -p 8080`.
 * Lo único que deben hacer los clientes es entregar inputs cuando el juego les pida, los que pueden ser un nombre para el jugador, o bien, un número que representa la opción seleccionada de entre un listado que aparece en la interfaz. De todas formas el servidor valida los input, y en caso de que no sean correctos se le pide a dicho jugador que vuelva a intentarlo.
