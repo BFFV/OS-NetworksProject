@@ -29,7 +29,7 @@
 
 * Se utilizaron diversos módulos para el desarrollo del programa del **servidor**. Los que más destacan son:
   - `game.c`: Maneja toda la lógica del programa, desde el lobby hasta el combate.
-  - `character.c`: Modela las entidades que participan en el combate (jugadores y monstruo), todos como una struct de tipo _Character_.
+  - `characters.c`: Modela las entidades que participan en el combate (jugadores y monstruo), todos como una struct de tipo _Character_.
   - `communication.c`: Maneja toda la comunicación entre el cliente y el servidor.
 * Los puntos de daño que aparecerán en el juego corresponden al mínimo entre la vida actual del personaje y lo que le quitará el ataque, es decir, si un ataque quita 2000 pero el jugador tiene sólo 1000 puntos de vida, el juego mostrará que se quitaron 1000 puntos (lo mismo aplica cuando se sana a un jugador).
 * Las rondas no se consideran completas hasta que juega el monstruo, por lo que la habilidad `sudo rm -rf` hace 0 de daño durante la **primera** ronda.
