@@ -61,3 +61,30 @@ void notify_users(int* clients, int n_clients, int pkg_id, char* message, int ex
         }
     }
 }
+
+// Send image to client
+void server_send_image(int client_socket, int pkg_id, char* message, int size) {
+    // Build packages
+    int sent = 0;
+    int n_packages = size / 255;
+    if (n_packages * 255 < size) {
+        n_packages++;
+    }
+    for (int p = 0; p < n_packages; p++) {
+        int to_send = size - sent;
+        if (to_send > 255) {
+            to_send = 255;
+        }
+        char* msg = calloc(4 + to_send, sizeof(char));
+        msg[0] = pkg_id;
+        msg[1] = n_packages;
+        msg[2] = p + 1;
+        msg[3] = to_send;
+        memcpy(&msg[4], message + sent, to_send);
+
+        // Send package
+        send(client_socket, msg, 4 + to_send, 0);
+        free(msg);
+        sent += to_send;
+    }
+}

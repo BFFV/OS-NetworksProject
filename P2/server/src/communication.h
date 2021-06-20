@@ -17,3 +17,6 @@ void server_send_message(int client_socket, int pkg_id, char* message);
 
 // Send message to all connected users
 void notify_users(int* clients, int n_clients, int pkg_id, char* message, int exception);
+
+// Send image to client
+void server_send_image(int client_socket, int pkg_id, char* message, int size);

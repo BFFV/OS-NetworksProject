@@ -32,8 +32,7 @@ void check_state(Game* game) {
     if (!game->monster->is_active) {
         char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
         notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), end_message, -1);
-
-        // TODO: Loot
+        gain_loot(game);  // Loot bonus
         reset_game(game);
 
     } else {
@@ -60,6 +59,7 @@ void check_state(Game* game) {
             if (!game->monster->is_active) {
                 char* end_message = "\nEl monstruo ha muerto!!! El combate ha finalizado...\n";
                 notify_users(game->players, game->num_players, get_pkg_id(MESSAGE), end_message, -1);
+                gain_loot(game);  // Loot bonus
                 reset_game(game);
                 free(active_characters);
                 return;
@@ -149,6 +149,32 @@ void destroy_game(Game* game) {
     free(game);
 }
 
+// Obtain random loot as reward
+void gain_loot(Game* game) {
+    for (int p = 0; p < game->num_players; p++) {
+        if (game->characters[p]->is_active) {
+            int amount = (rand() % 3) + 3;
+            int* numbers = random_loot(amount);
+            for (int l = 0; l < amount; l++) {
+                char* loot_path[3];
+                loot_path[0] = "loot/loot";
+                loot_path[1] = itoa(numbers[l]);
+                loot_path[2] = ".PNG";
+                char* loot_file = concatenate(loot_path, 3);
+                char* img_data = calloc(51200, sizeof(char));
+                int img_size = read_img(loot_file, img_data);
+                server_send_image(game->players[p], get_pkg_id(IMAGE), img_data, img_size);
+                free(loot_path[1]);
+                free(loot_file);
+                free(img_data);
+            }
+            char* new_loot = "\nTienes nuevo loot disponible gracias a tu victoria!\n";
+            server_send_message(game->players[p], get_pkg_id(MESSAGE), new_loot);
+            free(numbers);
+        }
+    }
+}
+
 
 // ----------- Networking ----------- //
 
@@ -199,6 +225,8 @@ int get_pkg_id(Request request_type) {
             return 8;
         case MESSAGE:
             return 9;
+        case IMAGE:
+            return 10;
     }
 }
 
@@ -1013,4 +1041,13 @@ void reorder_players(Game* game) {
         }
         index++;
     }
+}
+
+// Get random loot for a player
+int* random_loot(int amount) {
+    int* loot = malloc(amount * sizeof(int));
+    for (int l = 0; l < amount; l++) {
+        loot[l] = rand() % 10;
+    }
+    return loot;
 }

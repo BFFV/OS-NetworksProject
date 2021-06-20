@@ -34,3 +34,26 @@ void client_send_message(int client_socket, int pkg_id, char* message) {
     // Send package
     send(client_socket, msg, 2 + payloadSize, 0);
 }
+
+// Receive image
+int* client_receive_image(int client_socket, char* data) {
+    int n_packages = 0;
+    recv(client_socket, &n_packages, 1, 0);
+    int current_package = 0;
+    recv(client_socket, &current_package, 1, 0);
+    int payload_size = 0;
+    recv(client_socket, &payload_size, 1, 0);
+    int offset = (current_package - 1) * 255;
+    int received = recv(client_socket, data + offset, payload_size, MSG_WAITALL);
+
+    // Done + received
+    int* status = malloc(2 * sizeof(int));
+    status[0] = 1;
+    status[1] = payload_size;
+
+    // Last package
+    if (current_package == n_packages) {
+        status[0] = 0;
+    }
+    return status;
+}

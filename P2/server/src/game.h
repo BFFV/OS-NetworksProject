@@ -1,5 +1,6 @@
 #include "connection.h"
 #include "characters.h"
+#include "file_manager.h"
 #pragma once
 
 
@@ -30,6 +31,7 @@ typedef enum request_types {
     SELECT_OBJECTIVE,
     CONTINUE,
     MESSAGE,
+    IMAGE,
 } Request;
 
 
@@ -46,6 +48,9 @@ void reset_game(Game* game);
 
 // Destroy game
 void destroy_game(Game* game);
+
+// Obtain random loot as reward
+void gain_loot(Game* game);
 
 
 // ----------- Networking ----------- //
@@ -91,6 +96,10 @@ Character** get_active_characters(Game* game);
 
 // Reorder old players for new game
 void reorder_players(Game* game);
+
+// Get random loot for a player
+int* random_loot(int amount);
+
 
 // ----------- Handlers ----------- //
 
