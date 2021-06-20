@@ -452,6 +452,75 @@ double get_character_multiplier(Character* character) {
     return multiplier;
 };
 
+// Get status effects currently on the player
+char* get_player_status(Character* character) {
+    int stat_indexes[3];
+    for (int s = 0; s < 3; s++) {
+        stat_indexes[s] = 0;
+    }
+    char* stat[10];
+    stat[0] = "   ";
+    stat[1] = "";
+    stat[2] = "  ";
+    stat[3] = "";
+    stat[4] = "  ";
+    stat[5] = "";
+    stat[6] = "  ";
+    stat[7] = "";
+    stat[8] = "  ";
+    stat[9] = "";
+
+    // Bleed
+    if (character->bleeding_counter) {
+        char* bleed[3];
+        bleed[0] = RED "<SANGRADO (x";
+        bleed[1] = itoa(character->bleeding_counter);
+        bleed[2] = ")>";
+        stat[1] = concatenate(bleed, 3);
+        stat_indexes[0] = 1;
+        free(bleed[1]);
+    }
+
+    // Toxic
+    if (character->intoxicated_counter) {
+        char* toxic[3];
+        toxic[0] = PURPLE "<VENENO (";
+        toxic[1] = itoa(character->intoxicated_counter);
+        toxic[2] = ")>";
+        stat[3] = concatenate(toxic, 3);
+        stat_indexes[1] = 1;
+        free(toxic[1]);
+    }
+
+    // SQL
+    if (character->n_buffs) {
+        char* sql[3];
+        sql[0] = BLUE "<SQL (x";
+        sql[1] = itoa(character->n_buffs);
+        sql[2] = ")>";
+        stat[5] = concatenate(sql, 3);
+        stat_indexes[2] = 1;
+        free(sql[1]);
+    }
+
+    // Failed
+    if (character->failed_counter) {
+        stat[7] = YELLOW "<REPROBADO>";
+    }
+
+    // Distracted
+    if (character->next_defender_id != 999) {
+        stat[9] = CYAN"<DISTRAÍDO>";
+    }
+
+    char* status = concatenate(stat, 10);
+    for (int s = 0; s < 3; s++) {
+        if (stat_indexes[s]) {
+            free(stat[(s * 2) + 1]);
+        }
+    }
+    return status;
+}
 
 // -------------- Attack Functions ---------------
 

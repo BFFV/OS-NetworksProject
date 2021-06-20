@@ -6,6 +6,14 @@
 #include "communication.h"
 #pragma once
 
+// Colors
+#define RED "\e[1;31m"
+#define GREEN "\e[1;32m"
+#define BLUE "\e[1;34m"
+#define CYAN "\e[1;36m"
+#define YELLOW "\e[1;33m"
+#define PURPLE "\e[1;35m"
+
 
 // Classes for characters & monsters
 typedef enum character_class {
@@ -125,6 +133,9 @@ char* get_ability_name(Ability ability);
 
 // Calculates the damage modifier on character
 double get_character_multiplier(Character* character);
+
+// Get status effects currently on the player
+char* get_player_status(Character* character);
 
 // -------------- Attack Functions ---------------
 

@@ -576,15 +576,27 @@ void start_turn(int client, int player, Game* game) {
     int count = 0;
     for (int p = 0; p < game->num_players; p++) {
         if (game->characters[p]->is_active) {
-            char* player_raw_line[8];
+            char* player_raw_line[9];
 
             // Build character stats line
-            // TODO: add status effects lines with colors etc...
             player_raw_line[0] = game->usernames[p];
             char* raw_line_text_0 = " [";
+            switch (game->characters[p]->type) {
+                case HUNTER:
+                    raw_line_text_0 = RED " [";
+                    break;
+                case MEDIC:
+                    raw_line_text_0 = GREEN " [";
+                    break;
+                case HACKER:
+                    raw_line_text_0 = CYAN " [";
+                    break;
+                default:
+                    break;
+            }
             player_raw_line[1] = raw_line_text_0;
             player_raw_line[2] = game->characters[p]->class_name;
-            char* raw_line_text_1 = "] -> VIDA: ";
+            char* raw_line_text_1 = "] \e[0m-> VIDA: ";
             player_raw_line[3] = raw_line_text_1;
             char* current_health = itoa(game->characters[p]->current_hp);
             player_raw_line[4] = current_health;
@@ -592,25 +604,27 @@ void start_turn(int client, int player, Game* game) {
             player_raw_line[5] = raw_line_text_2;
             char* max_health = itoa(game->characters[p]->max_hp);
             player_raw_line[6] = max_health;
-            char* raw_line_text_3 = "\n";
-            player_raw_line[7] = raw_line_text_3;
+            player_raw_line[7] = get_player_status(game->characters[p]);
+            char* raw_line_text_3 = "\e[0m\n";
+            player_raw_line[8] = raw_line_text_3;
 
             // Add line to notification message
-            char* player_statistics = concatenate(player_raw_line, 8);
+            char* player_statistics = concatenate(player_raw_line, 9);
             players_messages[count] = player_statistics;
             game_stats_raw[count + 1] = players_messages[count];
             free(current_health);
             free(max_health);
+            free(player_raw_line[7]);
             count++;
         }
     }
 
     // Monster stats
     game_stats_raw[1 + game->active_players] = "-----------------------------------------------------------------------------------------------------------\n";
-    char* monster_stats_raw[7];
+    char* monster_stats_raw[8];
     monster_stats_raw[0] = game->monster->class_name;
-    monster_stats_raw[1] = " [MONSTRUO]";
-    char* monster_raw_text_0 = " -> VIDA: ";
+    monster_stats_raw[1] = PURPLE " [MONSTRUO]";
+    char* monster_raw_text_0 = " \e[0m-> VIDA: ";
     monster_stats_raw[2] = monster_raw_text_0;
     char* monster_current_hp = itoa(game->monster->current_hp);
     monster_stats_raw[3] = monster_current_hp;
@@ -618,14 +632,16 @@ void start_turn(int client, int player, Game* game) {
     monster_stats_raw[4] = monster_raw_text_1;
     char* monster_max_hp = itoa(game->monster->max_hp);
     monster_stats_raw[5] = monster_max_hp;
-    char* monster_raw_text_2 = "\n";
-    monster_stats_raw[6] = monster_raw_text_2;
+    monster_stats_raw[6] = get_player_status(game->monster);
+    char* monster_raw_text_2 = "\e[0m\n";
+    monster_stats_raw[7] = monster_raw_text_2;
 
     // Concatenate monster stats and add to notification
-    char* monster_stats = concatenate(monster_stats_raw, 7);
+    char* monster_stats = concatenate(monster_stats_raw, 8);
     game_stats_raw[2 + game->active_players] = monster_stats;
     free(monster_current_hp);
     free(monster_max_hp);
+    free(monster_stats_raw[6]);
 
     // Concatenate notification and notify all users
     char* game_stats_raw_footer = "***********************************************************************************************************\n\n";
