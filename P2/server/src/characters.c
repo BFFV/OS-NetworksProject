@@ -176,6 +176,7 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
     }
 
     Character* defender;
+    int next_defender = attacker->next_defender_id;
     if (attacker->next_defender_id != 999) {
         if (attacker->next_defender_id != -1) {
             defender = characters[attacker->next_defender_id];
@@ -246,7 +247,7 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
             break;
 
         case CASO_COPIA:
-            message = caso_copia(attacker, characters, n_characters, rounds);
+            message = caso_copia(attacker, characters, n_characters, rounds, next_defender);
             break;
 
         case REPROBATRON_9000:
@@ -877,7 +878,7 @@ char* espina_venenosa(Character* attacker, Character* defender) {
     return notification;
 }
 
-char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds) {
+char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds, int defender_id) {
     char* notification_message[2];
 
     // Select a random player and ability
@@ -886,6 +887,9 @@ char* caso_copia(Character* attacker, Character** characters, int n_characters, 
 
     // Select random target
     int defender_id_sel = (int)(rand() % n_characters);
+    if (defender_id != 999) {
+        defender_id_sel = defender_id;
+    }
     Ability ab_sel = characters[player_abl_sel]->abilities[ability_ind_sel];
 
 

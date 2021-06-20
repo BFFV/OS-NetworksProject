@@ -165,7 +165,7 @@ char* salto(Character* attacker, Character* defender);
 
 char* espina_venenosa(Character* attacker, Character* defender);
 
-char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds);
+char* caso_copia(Character* attacker, Character** characters, int n_characters, int rounds, int defender_id);
 
 char* reprobaton_9000(Character* attacker, Character* defender);
 
