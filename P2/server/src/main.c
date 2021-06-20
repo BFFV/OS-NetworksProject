@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
 
     // Stop server
     close(server);
-    printf("Server terminated normally\n");
+    printf("Server terminated normally!\n");
 
     return 0;
 }

@@ -12,7 +12,7 @@ int client_receive_id(int client_socket) {
 char* client_receive_payload(int client_socket) {
     int len = 0;
     recv(client_socket, &len, 1, 0);
-    char* payload = malloc(len);
+    char* payload = calloc(sizeof(char), len + 1);
     int received = recv(client_socket, payload, len, 0);
     return payload;
 }

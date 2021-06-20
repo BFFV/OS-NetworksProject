@@ -1,5 +1,6 @@
 #include "characters.h"
 
+
 // -------- Main Functions ---------
 
 // Create new character
@@ -12,11 +13,11 @@ Character* create_character(Class type) {
     character->intoxicated_counter = 0;
     character->bleeding_counter = 0;
 
-    // buffs and debuffs
+    // Buffs and debuffs
     character->n_buffs = 0;
     character->failed_counter = 0;
 
-    // special classes
+    // Special classes
     character->brute_force_counter = 0;
     character->jumped = false;
     character->next_defender_id = 999;
@@ -26,7 +27,6 @@ Character* create_character(Class type) {
         case HUNTER:
             character->class_name = "CAZADOR";
             character->probabilities = malloc(sizeof(double) * 1);
-
             character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = ESTOCADA;
@@ -35,7 +35,6 @@ Character* create_character(Class type) {
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
-
             character->is_monster = false;
             character->max_hp = 5000;
             character->current_hp = character->max_hp;
@@ -44,7 +43,6 @@ Character* create_character(Class type) {
         case MEDIC:
             character->class_name = "MÉDICO";
             character->probabilities = malloc(sizeof(double) * 1);
-
             character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = CURAR;
@@ -53,7 +51,6 @@ Character* create_character(Class type) {
             character->enemy_target[0] = 0;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
-
             character->is_monster = false;
             character->max_hp = 3000;
             character->current_hp = character->max_hp;
@@ -62,7 +59,6 @@ Character* create_character(Class type) {
         case HACKER:
             character->class_name = "HACKER";
             character->probabilities = malloc(sizeof(double) * 1);
-
             character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = INYECCION_SQL;
@@ -71,7 +67,6 @@ Character* create_character(Class type) {
             character->enemy_target[0] = 0;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
-
             character->is_monster = false;
             character->max_hp = 2500;
             character->current_hp = character->max_hp;
@@ -82,14 +77,12 @@ Character* create_character(Class type) {
             character->probabilities = malloc(sizeof(double) * 2);
             character->probabilities[0] = 0.5;
             character->probabilities[1] = 0.5;
-
             character->n_abilities = 2;
             character->abilities = malloc(sizeof(Ability) * 2);
             character->abilities[0] = RUZGAR;
             character->abilities[1] = COLETAZO;
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
-
             character->is_monster = true;
             character->max_hp = 10000;
             character->current_hp = character->max_hp;
@@ -100,14 +93,12 @@ Character* create_character(Class type) {
             character->probabilities = malloc(sizeof(double) * 2);
             character->probabilities[0] = 0.4;
             character->probabilities[1] = 0.6;
-
             character->n_abilities = 2;
             character->abilities = malloc(sizeof(Ability) * 2);
             character->abilities[0] = SALTO;
             character->abilities[1] = ESPINA_VENENOSA;
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
-
             character->is_monster = true;
             character->max_hp = 20000;
             character->current_hp = character->max_hp;
@@ -119,7 +110,6 @@ Character* create_character(Class type) {
             character->probabilities[0] = 0.4;
             character->probabilities[1] = 0.2;
             character->probabilities[2] = 0.4;
-
             character->n_abilities = 3;
             character->abilities = malloc(sizeof(Ability) * 3);
             character->abilities[0] = CASO_COPIA;
@@ -128,12 +118,10 @@ Character* create_character(Class type) {
             character->enemy_target[0] = 1;
             character->enemy_target[1] = 1;
             character->enemy_target[2] = 1;
-
             character->is_monster = true;
             character->max_hp = 25000;
             character->current_hp = character->max_hp;
             break;
-
     }
     return character;
 }
@@ -164,7 +152,6 @@ void lose_hp(Character* character, int hp) {
     if (character->current_hp <= 0) {
         character->current_hp = 0;
         character->is_active = false;
-        // TODO: death notification
     }
 }
 
@@ -196,7 +183,7 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
             defender = monster;
         }
 
-        // reset next defender
+        // Reset next defender
         attacker->next_defender_id = 999;
 
     } else if (defender_id == -1) {
@@ -206,7 +193,6 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
     }
 
     switch (ability) {
-
         case ESTOCADA:
             message = estocada(attacker, defender);
             break;
@@ -275,15 +261,13 @@ char* use_ability(int attacker_id, int defender_id, Character** characters, int 
     return message;
 }
 
-// Proc long term ability effects
-int apply_status_effects(Character** characters, int n_characters) {
-    // TODO: status notification
-    // Update active players
-    int death_count = 0;
+// Status effects
+void apply_status_effects(Character** characters, int n_characters, int* players, int num_players) {
 
+    // Apply effects to all affected players
     for (int c = 0; c < n_characters; c++) {
 
-        // Update buffs
+        // Update buffs (SQL)
         Buff* this_buff = characters[c]->buffs;
         Buff* new_head = characters[c]->buffs;
         for (int buff = 0; buff < characters[c]->n_buffs; buff++) {
@@ -299,23 +283,39 @@ int apply_status_effects(Character** characters, int n_characters) {
         // Intoxicated
         if (characters[c]->intoxicated_counter > 0) {
             characters[c]->intoxicated_counter--;
+            int dmg = int_min(400, characters[c]->current_hp);
             lose_hp(characters[c], 400);
+            char* toxic[4];
+            toxic[0] = characters[c]->name;
+            toxic[1] = " ha perdido ";
+            toxic[2] = itoa(dmg);
+            toxic[3] = " puntos de vida debido al veneno!\n";
+            char* toxic_msg = concatenate(toxic, 4);
+            notify_users(players, num_players, 9, toxic_msg, -1);
+            free(toxic[2]);
+            free(toxic_msg);
         }
 
-        // Bleeding loss hp
-        lose_hp(characters[c], 500 * characters[c]->bleeding_counter);
+        // Bleeding
+        if (characters[c]->bleeding_counter) {
+            int dmg = int_min(500 * characters[c]->bleeding_counter, characters[c]->current_hp);
+            lose_hp(characters[c], 500 * characters[c]->bleeding_counter);
+            char* bleed[4];
+            bleed[0] = characters[c]->name;
+            bleed[1] = " ha perdido ";
+            bleed[2] = itoa(dmg);
+            bleed[3] = " puntos de vida debido al sangrado!\n";
+            char* bleed_msg = concatenate(bleed, 4);
+            notify_users(players, num_players, 9, bleed_msg, -1);
+            free(bleed[2]);
+            free(bleed_msg);
+        }
 
-        // Failed status
+        // Failed
         if (characters[c]->failed_counter) {
             characters[c]->failed_counter--;
         }
-
-        if (!characters[c]->is_active) {
-            death_count++;
-        }
     }
-
-    return death_count;
 }
 
 
@@ -343,7 +343,7 @@ Class get_random_monster() {
 
 // Select a monster's ability, considering each probability
 int get_random_ability_id(Character* monster) {
-    double prob = ((double)rand()) / ((double)RAND_MAX);
+    double prob = ((double) rand()) / ((double) RAND_MAX);
     double current_prob = 0;
     int selected;
     for (int id = 0; id < monster->n_abilities; id++) {
@@ -365,9 +365,8 @@ Ability get_ability(Character* character, int ability_id) {
     return character->abilities[ability_id];
 }
 
-// Gest ability name
+// Get ability name
 char* get_ability_name(Ability ability) {
-
     char* name;
     switch (ability) {
         case ESTOCADA:
@@ -427,7 +426,7 @@ char* get_ability_name(Ability ability) {
             break;
 
         case REPROBATRON_9000:
-            name = "Reprobaton 9000";
+            name = "Reprobatón 9000";
             break;
 
         case SUDO_RM_RF:
@@ -439,7 +438,6 @@ char* get_ability_name(Ability ability) {
 
 // Calculates character damage for the buff queue
 double get_character_multiplier(Character* character) {
-
     double multiplier = 1.0;
     Buff* this_buff = character->buffs;
     for (int buff = 0; buff < character->n_buffs; buff++) {
@@ -487,7 +485,7 @@ char* estocada(Character* attacker, Character* defender) {
 
 char* corte_cruzado(Character* attacker, Character* defender) {
     char* raw_message[6];
-    int damage = (int)(3000 * get_character_multiplier(attacker));
+    int damage = (int) (3000 * get_character_multiplier(attacker));
 
     // Transform damage to string
     char* str_damage = itoa(int_min(damage, defender->current_hp));
@@ -549,8 +547,8 @@ char* curar(Character* healer, Character* defender) {
 char* destello_regenerador(Character* attacker, Character* defender, Character** characters, int n_characters) {
     char* raw_message[10];
 
-    // calculates damage and heal
-    int damage = (int)((750 + rand() % 1250) * get_character_multiplier(attacker));
+    // Calculates damage and heal
+    int damage = (int) ((750 + rand() % 1250) * get_character_multiplier(attacker));
     int heal = div_ceil(damage, 2);
 
     Character* objective;
@@ -572,14 +570,13 @@ char* destello_regenerador(Character* attacker, Character* defender, Character**
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Destello Regenerador> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " quitándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " y sanando a ";
     raw_message[6] = objective->name;
     raw_message[7] = " ";
     raw_message[8] = str_heal;
     raw_message[9] = " puntos de vida!\n";
-
     char* notification = concatenate(raw_message, 10);
     free(str_damage);
     free(str_heal);
@@ -600,7 +597,7 @@ char* descarga_vital(Character* attacker, Character* defender) {
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Descarga Vital> y liberó todo su daño sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " quitándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -657,7 +654,7 @@ char* ataque_ddos(Character* attacker, Character* defender) {
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Ataque DDOS> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " quitándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -683,7 +680,7 @@ char* brute_force_attack(Character* attacker, Character* defender) {
         raw_message[0] = attacker->name;
         raw_message[1] = " logró usar <Fuerza Bruta> sobre ";
         raw_message[2] = defender->name;
-        raw_message[3] = " quitándole ";
+        raw_message[3] = ", quitándole ";
         raw_message[4] = str_damage;
         raw_message[5] = " puntos de vida!\n";
         notification = concatenate(raw_message, 6);
@@ -709,7 +706,7 @@ char* brute_force_attack(Character* attacker, Character* defender) {
 
 char* ruzgar(Character* attacker, Character* defender) {
     char* raw_message[6];
-    int damage = (int)(1000 * get_character_multiplier(attacker));
+    int damage = (int) (1000 * get_character_multiplier(attacker));
 
     // Get total damage
     char* str_damage = itoa(int_min(damage, defender->current_hp));
@@ -719,7 +716,7 @@ char* ruzgar(Character* attacker, Character* defender) {
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Ruzgar> sobre ";
     raw_message[2] = defender->name;
-    raw_message[3] = " quitándole ";
+    raw_message[3] = ", quitándole ";
     raw_message[4] = str_damage;
     raw_message[5] = " puntos de vida!\n";
     char* notification = concatenate(raw_message, 6);
@@ -776,9 +773,9 @@ char* salto(Character* attacker, Character* defender) {
 char* espina_venenosa(Character* attacker, Character* defender) {
     char* notification;
 
-    // Check if target already intoxicated
+    // Check if target is already intoxicated
     if (defender->intoxicated_counter > 0) {
-        int damage = (int)(500 * get_character_multiplier(attacker));
+        int damage = (int) (500 * get_character_multiplier(attacker));
 
         // Get total damage
         char* str_damage = itoa(int_min(damage, defender->current_hp));
@@ -825,7 +822,7 @@ char* caso_copia(Character* attacker, Character** characters, int n_characters, 
 
     char* raw_message[6];
     raw_message[0] = attacker->name;
-    raw_message[1] = " usó <Caso Copia>. Copió la habilidad <";
+    raw_message[1] = " usó <Caso Copia> y logró copiar la habilidad <";
     raw_message[2] = get_ability_name(ab_sel);
     raw_message[3] = "> del jugador ";
     raw_message[4] = characters[player_abl_sel]->name;
@@ -843,13 +840,11 @@ char* caso_copia(Character* attacker, Character** characters, int n_characters, 
 char* reprobaton_9000(Character* attacker, Character* defender) {
     char* raw_message[5];
     defender->failed_counter = 2;
-
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <Reprobatón 9000> contra ";
     raw_message[2] = defender->name;
-    raw_message[3] = "!\nRecibirá 50\% de daño extra y sus ataques";
-    raw_message[4] = " harán un 50\% menos de daño!";
-
+    raw_message[3] = ", por lo que recibirá 50\% de daño extra y sus ataques";
+    raw_message[4] = " harán un 50\% menos de daño durante 1 ronda!\n";
     char* message = concatenate(raw_message, 5);
     return message;
 }
@@ -867,7 +862,7 @@ char* sudo_rm_rf(Character* attacker, Character** characters, int n_characters, 
     raw_message[0] = attacker->name;
     raw_message[1] = " usó <sudo rm -rf>. Todos recibirán 100 de daño por cada ronda. Se han jugado ";
     raw_message[2] = itoa(rounds);
-    raw_message[3] = "!\nPor lo tanto recibirán ";
+    raw_message[3] = "!\nPor lo tanto todos recibirán ";
     raw_message[4] = itoa(damage);
     raw_message[5] = " de daño!\n";
     char* message = concatenate(raw_message, 6);

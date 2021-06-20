@@ -36,7 +36,7 @@ int div_ceil(int a, int b) {
     return result;
 }
 
-
+// Get min
 int int_min(int a, int b) {
     int min;
     if (a <= b) {

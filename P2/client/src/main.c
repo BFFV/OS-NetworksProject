@@ -13,24 +13,34 @@ char* get_input() {
     while (true) {
         char c = getchar();
         if (c == '\n') break;
-        response[pos] = c;
+        if (pos <= 253) {
+            response[pos] = c;
+        }
         pos++;
     }
-    response[pos] = '\0';
     return response;
 }
 
 // Monster Hunter Client
-int main (int argc, char *argv[]) {
+int main (int argc, char* argv[]) {
+
+    // Check input
+    if (argc < 5) {
+        printf("[Error] Not enough arguments were provided!\n");
+        return 1;
+    }
 
     // Initialize client
-    int client = prepare_socket(argv[2], atoi(argv[4]));
+    int* connection = prepare_socket(argv[2], atoi(argv[4]));
 
     // Run client
     bool running = true;
+    if (connection[1] == -1) {
+        running = false;
+    }
     while (running) {
-        int msg_code = client_receive_id(client);
-        char* message = client_receive_payload(client);
+        int msg_code = client_receive_id(connection[0]);
+        char* message = client_receive_payload(connection[0]);
         printf("%s", message);
         free(message);
 
@@ -39,12 +49,14 @@ int main (int argc, char *argv[]) {
             running = false;
         } else if (msg_code != 9) {  // Input required
             char* response = get_input();
-            client_send_message(client, msg_code, response);
+            client_send_message(connection[0], msg_code, response);
+            free(response);
         }
     }
 
     // Close client socket
-    close(client);
+    close(connection[0]);
+    free(connection);
 
     return 0;
 }

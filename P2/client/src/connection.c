@@ -2,7 +2,7 @@
 
 
 // Connect to server
-int prepare_socket(char* IP, int PORT) {
+int* prepare_socket(char* IP, int PORT) {
     struct sockaddr_in server_addr;
 
     // Create socket for client
@@ -16,5 +16,11 @@ int prepare_socket(char* IP, int PORT) {
 
     // Connect to server
     int ret = connect(client_socket, (struct sockaddr*) &server_addr, sizeof(server_addr));
-    return client_socket;
+
+    // Socket + Connection
+    int* connection = malloc(2 * sizeof(int));
+    connection[0] = client_socket;
+    connection[1] = ret;
+
+    return connection;
 }

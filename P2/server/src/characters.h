@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "utils.h"
+#include "communication.h"
 #pragma once
 
 
@@ -51,8 +52,8 @@ typedef struct character Character;
 struct character {
 
     // Stats
-    bool is_monster;    // True is character is a monster
-    bool is_active;     // True is character is alive
+    bool is_monster;    // True if character is a monster
+    bool is_active;     // True if character is alive
     int current_hp;     // Current health
     int max_hp;         // Maximum health
 
@@ -66,7 +67,7 @@ struct character {
     Ability* abilities;
     double* probabilities;  // (Monsters) Contains the prob of each ability
     int enemy_target[3];    // Tells if the ability in pos x attacks an enemy
-    int selected_skill_id;  // The next ability to be used.
+    int selected_skill_id;  // The next ability to be used
 
     // Damage counters
     int intoxicated_counter;
@@ -105,8 +106,8 @@ void recover_hp(Character* character, int hp);
 // Use a selected ability
 char* use_ability(int attacker_id, int defender_id, Character** characters, int n_characters, Character* monster, int rounds, Ability ability);
 
-// Apply/Updates long term effects
-int apply_status_effects(Character** characters, int n_characters);
+// Apply/Update long term effects
+void apply_status_effects(Character** characters, int n_characters, int* players, int num_players);
 
 
 // ---------- Helpers -------------------

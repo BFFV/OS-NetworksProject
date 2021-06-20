@@ -1,5 +1,4 @@
 #include "connection.h"
-#include "communication.h"
 #include "characters.h"
 #pragma once
 
@@ -66,23 +65,31 @@ void process_request(Request req_type, int client, int player, Game* game);
 
 // ----------- Helper Functions ----------- //
 
+// Send action selection message
 void send_select_action_message(Game* game, int player);
 
+// Send skill selection message
 void send_select_skill_message(Game* game, int player);
 
+// Send objective message if needed
 void send_select_objective_message(Game* game, int player);
 
+// The monster uses an ability on a random user
 void monster_turn(Game* game);
 
+// Gets the next active player
 int get_next_player(Game* game, int index);
 
 // Get active player index
 int get_active_index(Game* game, int player);
 
+// Get active socket by index
 int get_active_socket(Game* game, int random);
 
+// Get active characters
 Character** get_active_characters(Game* game);
 
+// Reorder old players for new game
 void reorder_players(Game* game);
 
 // ----------- Handlers ----------- //

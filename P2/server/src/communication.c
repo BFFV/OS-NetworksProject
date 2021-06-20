@@ -1,5 +1,6 @@
 #include "communication.h"
 
+
 // Receive ID from message
 int server_receive_id(int client_socket) {
     int id = 0;
