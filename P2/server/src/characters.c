@@ -618,7 +618,7 @@ char* destello_regenerador(Character* attacker, Character* defender, Character**
     char* raw_message[10];
 
     // Calculates damage and heal
-    int damage = (int) ((750 + rand() % 1250) * get_character_multiplier(attacker));
+    int damage = (int) ((750 + rand() % 1251) * get_character_multiplier(attacker));
     int heal = div_ceil(damage, 2);
 
     Character* objective;
